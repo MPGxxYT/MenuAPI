@@ -10,7 +10,17 @@ import org.bukkit.inventory.Inventory;
 
 public class GUIManager {
 
-    private final Map<Inventory, InventoryHandler> activeInventories = new HashMap<>();
+  private static class Singleton {
+    private static final GUIManager INSTANCE = new GUIManager();
+  }
+
+  public static GUIManager getInstance() {
+    return Singleton.INSTANCE;
+  }
+
+  private GUIManager() {}
+
+  private final Map<Inventory, InventoryHandler> activeInventories = new HashMap<>();
 
     public void openGUI(InventoryGUI gui, Player player) {
         this.registerHandledInventory(gui.getInventory(), gui);
