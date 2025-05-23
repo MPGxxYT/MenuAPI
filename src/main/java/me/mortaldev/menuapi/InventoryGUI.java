@@ -15,10 +15,23 @@ public abstract class InventoryGUI implements InventoryHandler {
   private boolean allowBottomInventoryClick;
   private boolean allowTopInventoryClick;
   private Inventory inventory;
+  private Player registeredPlayer;
 
   public InventoryGUI() {
     allowBottomInventoryClick = false;
     allowTopInventoryClick = false;
+  }
+
+  public void registerPlayer(Player player) {
+    if (registeredPlayer == null) {
+      this.registeredPlayer = player;
+      return;
+    }
+    throw new IllegalStateException("Player has already been registered.");
+  }
+
+  public Player getRegisteredPlayer() {
+    return registeredPlayer;
   }
 
   public Inventory getInventory() {
@@ -50,7 +63,6 @@ public abstract class InventoryGUI implements InventoryHandler {
 
   @Override
   public void onClick(InventoryClickEvent event) {
-
     if (event.getView().getBottomInventory() == event.getClickedInventory()
         && !allowBottomInventoryClick) {
       event.setCancelled(true);
@@ -73,8 +85,7 @@ public abstract class InventoryGUI implements InventoryHandler {
   }
 
   @Override
-  public void onClose(InventoryCloseEvent event) {
-  }
+  public void onClose(InventoryCloseEvent event) {}
 
   protected abstract Inventory createInventory();
 }
