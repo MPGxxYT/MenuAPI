@@ -119,6 +119,47 @@ public abstract class InventoryGUI implements InventoryHandler {
   }
 
   /**
+   * Refreshes all button icons in the inventory for the registered player.
+   * This is useful for updating button displays without recreating the entire inventory.
+   * Uses the already registered player to regenerate icons.
+   */
+  public void refreshButtons() {
+    if (registeredPlayer == null || inventory == null) {
+      return;
+    }
+    this.buttonMap.forEach( //
+        (slot, button) -> { //
+          ItemStack icon = button.getIconCreator().apply(registeredPlayer); //
+          this.inventory.setItem(slot, icon); //
+        });
+  }
+
+  /**
+   * Refreshes a specific button at the given slot.
+   *
+   * @param slot The slot of the button to refresh.
+   */
+  public void refreshButton(int slot) {
+    if (registeredPlayer == null || inventory == null) {
+      return;
+    }
+    InventoryButton button = this.buttonMap.get(slot);
+    if (button != null) {
+      ItemStack icon = button.getIconCreator().apply(registeredPlayer);
+      this.inventory.setItem(slot, icon);
+    }
+  }
+
+  /**
+   * Gets the button map for advanced manipulation.
+   *
+   * @return The map of slot to InventoryButton.
+   */
+  protected Map<Integer, InventoryButton> getButtonMap() {
+    return buttonMap;
+  }
+
+  /**
    * Handles an inventory click event for this GUI.
    * It controls whether clicks in the bottom or top inventory are cancelled based on
    * {@code allowBottomInventoryClick} and {@code allowTopInventoryClick}.
