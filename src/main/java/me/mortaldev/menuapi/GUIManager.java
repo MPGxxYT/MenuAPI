@@ -1,6 +1,7 @@
 package me.mortaldev.menuapi;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -14,25 +15,14 @@ import org.bukkit.inventory.Inventory;
  */
 public class GUIManager {
 
-  /**
-   * Inner class to hold the single instance of GUIManager.
-   */
   private static class Singleton {
-    private static final GUIManager INSTANCE = new GUIManager(); //
+    private static final GUIManager INSTANCE = new GUIManager();
   }
 
-  /**
-   * Returns the singleton instance of the GUIManager.
-   *
-   * @return The GUIManager instance.
-   */
   public static GUIManager getInstance() {
-    return Singleton.INSTANCE; //
+    return Singleton.INSTANCE;
   }
 
-  /**
-   * Private constructor to prevent direct instantiation.
-   */
   private GUIManager() {}
 
   private final Map<Inventory, InventoryHandler> activeInventories = new HashMap<>(); //
@@ -202,7 +192,7 @@ public class GUIManager {
    * @param player The player to hide HUDs for.
    * @param hudIds List of HUD namespace IDs to hide.
    */
-  private void hideHuds(Player player, java.util.List<String> hudIds) {
+  private void hideHuds(Player player, List<String> hudIds) {
     try {
       // PlayerHudsHolderWrapper hudsHolder = new PlayerHudsHolderWrapper(player);
       Class<?> holderClass = Class.forName("dev.lone.itemsadder.api.FontImages.PlayerHudsHolderWrapper");

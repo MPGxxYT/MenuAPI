@@ -11,7 +11,7 @@ import org.bukkit.event.inventory.InventoryOpenEvent;
  */
 public class GUIListener implements Listener {
 
-    private final GUIManager guiManager; //
+    private final GUIManager guiManager;
 
     /**
      * Constructs a new GUIListener with the given GUIManager.
