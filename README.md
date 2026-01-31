@@ -1,5 +1,7 @@
 # MenuAPI
 
+[![](https://jitpack.io/v/MPGxxYT/MenuAPI.svg)](https://jitpack.io/#MPGxxYT/MenuAPI)
+
 A lightweight, object-oriented library for creating interactive inventory GUIs in Bukkit/Paper plugins.
 
 ## Features
@@ -20,20 +22,50 @@ A lightweight, object-oriented library for creating interactive inventory GUIs i
 
 ## Installation
 
-Add the dependency to your `pom.xml`:
+### Maven (JitPack)
 
-<details>
-<summary>Maven Dependency</summary>
+Add the JitPack repository to your `pom.xml`:
+
+```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+```
+
+Then add the dependency:
 
 ```xml
 <dependency>
-    <groupId>me.mortaldev</groupId>
+    <groupId>com.github.MPGxxYT</groupId>
     <artifactId>MenuAPI</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>v1.0.0</version>
 </dependency>
 ```
 
-</details>
+### Gradle (JitPack)
+
+```groovy
+repositories {
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    implementation 'com.github.MPGxxYT:MenuAPI:v1.0.0'
+}
+```
+
+### Development Builds
+
+For the latest development version:
+
+```xml
+<version>master-SNAPSHOT</version>
+```
+
+Note: SNAPSHOT versions may change without notice.
 
 ## Setup
 
