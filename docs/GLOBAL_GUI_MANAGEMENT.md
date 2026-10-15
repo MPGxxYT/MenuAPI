@@ -1,6 +1,6 @@
 # Global GUI Management Guide
 
-Complete guide to tracking and managing GUIs across all players using MenuAPI's static methods.
+Complete guide to tracking and managing GUIs across all players with the methods on `GUIManager.getInstance()`.
 
 ## Table of Contents
 - [Overview](#overview)
@@ -9,6 +9,7 @@ Complete guide to tracking and managing GUIs across all players using MenuAPI's 
 - [Use Cases](#use-cases)
 - [Advanced Examples](#advanced-examples)
 - [Best Practices](#best-practices)
+- [Threading](#threading)
 
 ---
 
@@ -23,7 +24,7 @@ MenuAPI automatically tracks all open GUIs across all players, allowing you to:
 ### Key Features
 - **Automatic tracking** - GUIs register on open, unregister on close
 - **Type-safe** - Refresh specific GUI classes
-- **Thread-safe** - Uses ConcurrentHashMap
+- **Main thread only** - Call these methods from the server thread (see [Threading](#threading))
 - **No manual management** - Everything is automatic
 
 ---
@@ -92,10 +93,20 @@ Calls `refreshGUI()` on all matching GUI instances:
 GUIManager.getInstance().refreshAllGUIsOfType(LobbiesMenu.class);
 ```
 
+`refreshGUI()` redraws the buttons by default, the same as `refreshButtonsForType`. For a full rebuild, the menu overrides it to call `rebuild()`, which runs `createInventory()` and `decorate()` again:
+
+```java
+public class LobbiesMenu extends InventoryGUI {
+  @Override
+  protected void refreshGUI() {
+    rebuild();
+  }
+}
+```
+
 **Use when:**
-- Data structure changed (items added/removed)
-- Need complete GUI recreation
-- Complex updates required
+- Data structure changed (items added/removed) and the menu's `refreshGUI()` calls `rebuild()`
+- The menu overrides `refreshGUI()` with its own update logic
 
 ### Button Refresh All GUIs
 
@@ -229,12 +240,9 @@ public void openPlayMenu(Player player) {
       player.sendMessage("§cYou already have the play menu open!");
       return;
     }
-
-    // Close current GUI before opening new one
-    player.closeInventory();
   }
 
-  // Safe to open
+  // Replaces any other open menu; its onClose runs as usual
   GUIManager.getInstance().openGUI(new PlayMenu(), player);
 }
 ```
@@ -496,7 +504,7 @@ SmartMenu.refreshAll();
 
 ## API Reference
 
-### Static Methods
+### Methods
 
 ```java
 // Refresh all GUIs of a type (calls refreshGUI())
@@ -514,12 +522,12 @@ GUIManager.getInstance().hasOpenGUI(Player player)  // Returns boolean
 
 ### When to Use Each Method
 
-| Method | When to Use | Performance |
-|--------|-------------|-------------|
-| `refreshButtonsForType()` | Button content changed, structure same | ⚡ Fast |
-| `refreshAllGUIsOfType()` | Items added/removed, size changed | 🐌 Slower |
-| `getOpenGUI()` | Need specific GUI instance | ⚡ Fast |
-| `hasOpenGUI()` | Just checking if GUI open | ⚡ Fast |
+| Method | When to Use | Cost |
+|--------|-------------|------|
+| `refreshButtonsForType()` | Button content changed, structure same | Runs each button's creator |
+| `refreshAllGUIsOfType()` | Items added/removed, size changed (with `refreshGUI()` calling `rebuild()`) | Whatever `refreshGUI()` does; a rebuild runs `createInventory()` and `decorate()` too |
+| `getOpenGUI()` | Need specific GUI instance | Map lookup |
+| `hasOpenGUI()` | Just checking if GUI open | Map lookup |
 
 ---
 
@@ -552,6 +560,18 @@ Bukkit.getScheduler().runTask(plugin, () -> {
 - Batch updates together
 - Cache expensive calculations
 
+### Threading
+
+`GUIManager` keeps its sessions in plain maps and calls Bukkit inventory methods, so every method here, along with `openGUI` and `rebuild()`, must run on the server's main thread. If your data comes from an async task, such as a database query, switch back before touching menus:
+
+```java
+Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+  lobbyStorage.save(lobby);
+  Bukkit.getScheduler().runTask(plugin, () ->
+      GUIManager.getInstance().refreshAllGUIsOfType(LobbiesMenu.class));
+});
+```
+
 ### Wrong GUIs Being Refreshed
 
 **Problem:** Unintended GUIs are being refreshed.
@@ -574,13 +594,15 @@ GUIManager.getInstance().refreshButtonsForType(PlayMenu.class);
 ## Summary
 
 Global GUI management provides:
-- ✅ Automatic tracking of all open GUIs
-- ✅ Type-safe refresh methods
-- ✅ Thread-safe concurrent access
-- ✅ No manual registration required
-- ✅ Easy integration with data managers
+- Automatic tracking of all open GUIs
+- Refresh methods that target one GUI class
+- No manual registration required
+- Integration with data managers that change what menus show
+
+All of it runs on the main thread.
 
 For more information, see:
+- [Getting Started](GETTING_STARTED.md)
 - [Main MenuAPI Guide](MENUAPI_GUIDE.md)
 - [Auto-Refresh Guide](AUTO_REFRESH_GUIDE.md)
 - [IAButton Usage Guide](IABUTTON_USAGE.md)
