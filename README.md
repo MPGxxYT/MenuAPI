@@ -44,7 +44,7 @@ MenuAPI is published through [JitPack](https://jitpack.io/#MPGxxYT/MenuAPI).
 <dependency>
     <groupId>com.github.MPGxxYT</groupId>
     <artifactId>MenuAPI</artifactId>
-    <version>v2.0.0</version>
+    <version>v2.1.0</version>
 </dependency>
 ```
 
@@ -56,7 +56,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.MPGxxYT:MenuAPI:v2.0.0'
+    implementation 'com.github.MPGxxYT:MenuAPI:v2.1.0'
 }
 ```
 
@@ -102,10 +102,10 @@ Open it:
 GUIManager.getInstance().openGUI(new MainMenu(), player);
 ```
 
-`decorate` runs once when the menu opens. MenuAPI draws the buttons after it returns, so there is no need to call `super.decorate(player)`.
+`decorate` runs when the menu opens, and again on every `rebuild()`. MenuAPI draws the buttons after it returns, so there is no need to call `super.decorate(player)`. Add buttons in `decorate`, not the constructor: a rebuild removes every button before calling `decorate` again.
 
 > [!NOTE]
-> A menu instance can be opened once. To show the same menu again, create a new instance. Opening an instance a second time throws `IllegalStateException`.
+> `openGUI` opens a menu instance once; opening it a second time throws `IllegalStateException`. To show it again with its current state, call `rebuild()` on it.
 
 ## Usage
 
@@ -143,6 +143,40 @@ removeButton(10);       // remove a button and clear its icon
 getButton(13);          // the button at a slot, or null
 ```
 
+### Rebuilding
+
+`rebuild()` builds a menu again from its own fields: `createInventory` and `decorate` run again, and the buttons are replaced. Use it when a click changes what the menu shows, such as a page, a filter or a search. The menu keeps its fields, so managers passed to its constructor don't need to be passed again.
+
+```java
+public class StaffMenu extends InventoryGUI {
+    private final StaffManager staffManager;
+    private int page = 1;
+
+    public StaffMenu(StaffManager staffManager) {
+        this.staffManager = staffManager;
+    }
+
+    @Override
+    public void decorate(Player player) {
+        List<Staff> staff = staffManager.page(page);   // loaded on every rebuild
+        // ... add a button per staff member ...
+        addButton(53, new InventoryButton()
+            .creator(p -> new ItemStack(Material.ARROW))
+            .consumer(event -> {
+                page++;
+                rebuild();
+            }));
+    }
+}
+```
+
+- If the menu is open and its size is unchanged, it is redrawn in the inventory on screen, so the cursor does not move. A title change alone is not shown in this case.
+- If the size changed, the new inventory opens. The session continues, and `onOpen` and `onClose` are not called.
+- If the menu was closed, for example by an anvil prompt, it opens again as a new session and `onOpen` is called. This also replaces any other menu the player has open.
+- If the player is offline, nothing happens.
+
+Data loaded in the constructor is not loaded again; load anything that must stay current in `createInventory` or `decorate`. Calling `rebuild()` from inside either of them throws `IllegalStateException`.
+
 ### Clicks and hooks
 
 By default, clicks in both the menu and the player's own inventory are cancelled. Button handlers still run. To allow clicks:
@@ -174,12 +208,12 @@ public LiveStatsMenu() {
 
 The task starts when the menu opens and stops when it closes, when the player opens another menu, or when the player goes offline. `disableAutoRefresh()` stops it while the menu stays open.
 
-Each tick calls `refreshGUI()`, which redraws the buttons by default. To rebuild the menu instead, for example when the number of items changes, override it and open a new instance:
+Each tick calls `refreshGUI()`, which redraws the buttons by default. To rebuild the menu instead, for example when the number of items changes, override it and call `rebuild()`. The refresh task keeps running:
 
 ```java
 @Override
 protected void refreshGUI() {
-    GUIManager.getInstance().openGUI(new LobbiesMenu(), getRegisteredPlayer());
+    rebuild();
 }
 ```
 

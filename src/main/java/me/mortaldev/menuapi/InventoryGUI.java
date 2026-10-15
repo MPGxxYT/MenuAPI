@@ -16,7 +16,8 @@ import org.bukkit.plugin.Plugin;
  * {@link #onClick(InventoryClickEvent)} and {@link #onClose(InventoryCloseEvent)} are optional
  * hooks and do not need to call {@code super}.
  *
- * <p>A GUI instance can be opened once. To show the same menu again, create a new instance.
+ * <p>A GUI instance is opened once with {@link GUIManager#openGUI}. After that, {@link #rebuild()}
+ * shows it again with its current state, whether it is still open or has been closed.
  */
 public abstract class InventoryGUI {
 
@@ -25,6 +26,8 @@ public abstract class InventoryGUI {
   private boolean allowTopInventoryClick;
   private Inventory inventory;
   private Player registeredPlayer;
+  private GUIManager manager;
+  private boolean building;
 
   // Auto-refresh settings; the task itself is run by GUIManager
   private long autoRefreshIntervalTicks = 20L;
@@ -45,11 +48,12 @@ public abstract class InventoryGUI {
    *
    * @throws IllegalStateException If a player has already been registered.
    */
-  void registerPlayer(Player player) {
+  void registerPlayer(Player player, GUIManager manager) {
     if (registeredPlayer != null) {
       throw new IllegalStateException("Player has already been registered.");
     }
     this.registeredPlayer = player;
+    this.manager = manager;
   }
 
   boolean hasRegisteredPlayer() {
@@ -99,8 +103,71 @@ public abstract class InventoryGUI {
     return inventory;
   }
 
-  /** Called by {@link GUIManager} when this GUI closes, after the onClose hook. */
+  /**
+   * Called by {@link GUIManager} when this GUI closes, after the onClose hook, and before a rebuild
+   * shows it again in a new inventory.
+   */
   void hidden(Player player) {}
+
+  /**
+   * Creates the inventory for a rebuild of an open GUI. Returns null if the GUI can only get a new
+   * inventory by being shown again.
+   */
+  Inventory createRebuildInventory() {
+    return createInventory();
+  }
+
+  /** Removes every button and forgets the inventory, so the next show creates a new one. */
+  void resetForReopen() {
+    layout.clear(null);
+    inventory = null;
+  }
+
+  /** Removes every button and clears its slots in the current inventory. */
+  void clearButtons() {
+    layout.clear(inventory);
+  }
+
+  boolean isBuilding() {
+    return building;
+  }
+
+  void setBuilding(boolean building) {
+    this.building = building;
+  }
+
+  /**
+   * Builds this GUI again from its current state: {@link #createInventory()} and {@link
+   * #decorate(Player)} run again, and every button is replaced by the ones {@code decorate} adds.
+   * Call it after changing the fields the menu is drawn from, instead of opening a new instance.
+   *
+   * <ul>
+   *   <li>If the GUI is open and the new inventory has the same size, it is redrawn in the
+   *       inventory already on screen, so the player's cursor does not move. A title change alone
+   *       is not shown in this case.
+   *   <li>If the GUI is open and the size changed, the new inventory is opened. The session
+   *       continues: onOpen and onClose are not called.
+   *   <li>If the GUI has been closed, for example by an anvil prompt, it opens again for its player
+   *       as a new session, and onOpen is called.
+   *   <li>If the player is offline, nothing happens.
+   * </ul>
+   *
+   * <p>Anything loaded in the constructor is not loaded again. Load data that must stay current in
+   * {@link #createInventory()} or {@link #decorate(Player)}.
+   *
+   * @throws IllegalStateException If this GUI has never been opened, or if called from inside
+   *     createInventory or decorate.
+   */
+  public void rebuild() {
+    if (manager == null) {
+      throw new IllegalStateException(
+          "This GUI has not been opened. Open it with GUIManager.openGUI first.");
+    }
+    if (building) {
+      throw new IllegalStateException("rebuild() cannot be called from createInventory or decorate.");
+    }
+    manager.rebuild(this);
+  }
 
   /**
    * Sets whether clicks in the player's bottom inventory are allowed.
@@ -288,12 +355,12 @@ public abstract class InventoryGUI {
    * this calls {@link #refreshButtons()}.
    *
    * <p>For GUIs that need to be rebuilt (for example when items are added or removed), override this
-   * to open a new instance. The current session, including its refresh task, ends automatically:
+   * to call {@link #rebuild()}. The session and its refresh task continue:
    *
    * <pre>{@code
    * @Override
    * protected void refreshGUI() {
-   *   GUIManager.getInstance().openGUI(new MyMenu(updatedData), getRegisteredPlayer());
+   *   rebuild();
    * }
    * }</pre>
    */

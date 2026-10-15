@@ -54,6 +54,18 @@ final class ButtonLayout {
     }
   }
 
+  /** Removes every button and clears its slots in the inventory, if there is one. */
+  void clear(Inventory inventory) {
+    if (inventory != null) {
+      for (int slot : buttonsBySlot.keySet()) {
+        if (slot < inventory.getSize()) {
+          inventory.setItem(slot, null);
+        }
+      }
+    }
+    buttonsBySlot.clear();
+  }
+
   /** Draws every button. */
   void render(Player player, Inventory inventory) {
     Map<InventoryButton, List<Integer>> slotsByButton = new LinkedHashMap<>();
