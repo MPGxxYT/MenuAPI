@@ -77,6 +77,8 @@ v2 moves the session lifecycle into `GUIManager`:
 - `InventoryHandler`, `registerHandledInventory` and `unregisterInventory` are removed. Open every GUI with `GUIManager.getInstance().openGUI(gui, player)`.
 - A GUI instance can be opened once; opening it again throws `IllegalStateException`.
 - `onOpen` runs after the inventory is on screen, so cancelling its event no longer cancels the open. `GUIManager.handleOpen` is removed.
+- `getButtonMap()` is replaced by `getButton(slot)` and `removeButton(slot)`; `removeButton` also clears the icon.
+- An `IAButton` that runs past the right edge now throws instead of being clipped, and a button placed past the end of the inventory throws a clear `IllegalArgumentException` when the GUI is drawn.
 - An ItemsAdder wrapper whose `showInventory` throws without opening anything now makes `openGUI` throw `IllegalStateException` instead of continuing silently.
 
 ## Setup

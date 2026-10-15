@@ -461,7 +461,8 @@ IAButton automatically validates inputs:
 - **Width**: Must be between 1 and 9 (inclusive)
 - **Height**: Must be between 1 and 6 (inclusive)
 - **Anchor**: Must be non-negative
-- **Overflow**: Automatically prevents overflow beyond 9-slot width per row
+- **Overflow**: An area that runs past the right edge (anchor column + width > 9) throws when the button is added
+- **Inventory size**: A slot past the end of the inventory throws when the GUI is drawn, naming the slot and the inventory size
 
 ```java
 // These will throw IllegalArgumentException

@@ -1,13 +1,10 @@
 package me.mortaldev.menuapi;
 
-import java.util.HashMap;
-import java.util.Map;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 /**
@@ -23,7 +20,7 @@ import org.bukkit.plugin.Plugin;
  */
 public abstract class InventoryGUI {
 
-  private final Map<Integer, InventoryButton> buttonMap = new HashMap<>();
+  private final ButtonLayout layout = new ButtonLayout();
   private boolean allowBottomInventoryClick;
   private boolean allowTopInventoryClick;
   private Inventory inventory;
@@ -131,30 +128,48 @@ public abstract class InventoryGUI {
    * @param button The InventoryButton to add.
    */
   public void addButton(int slot, InventoryButton button) {
-    this.buttonMap.put(slot, button);
+    layout.place(button, slot);
   }
 
   /**
-   * Adds an {@link InventoryButton} to multiple slots in the GUI.
+   * Adds an {@link InventoryButton} to multiple slots in the GUI. Its icon is created once per draw
+   * and placed in every slot.
    *
    * @param button The InventoryButton to add.
    * @param slots The slot indices where the button will be placed.
    */
   public void addButton(InventoryButton button, int... slots) {
-    for (int slot : slots) {
-      this.buttonMap.put(slot, button);
-    }
+    layout.place(button, slots);
   }
 
   /**
    * Adds an {@link IAButton} to every slot it occupies, based on its size and anchor.
    *
    * @param iaButton The IAButton to add.
+   * @throws IllegalArgumentException If the area runs past the right edge of the inventory.
    */
   public void addButton(IAButton iaButton) {
-    for (int slot : iaButton.getOccupiedSlots()) {
-      this.buttonMap.put(slot, iaButton);
-    }
+    layout.place(iaButton);
+  }
+
+  /**
+   * Gets the button at a slot.
+   *
+   * @param slot The slot to check.
+   * @return The button, or null if the slot has none.
+   */
+  public InventoryButton getButton(int slot) {
+    return layout.buttonAt(slot);
+  }
+
+  /**
+   * Removes the button at a slot and clears its icon. If it is an IAButton, it is removed from
+   * every slot it covers.
+   *
+   * @param slot The slot of the button to remove.
+   */
+  public void removeButton(int slot) {
+    layout.remove(slot, inventory);
   }
 
   /**
@@ -165,18 +180,16 @@ public abstract class InventoryGUI {
    */
   public void decorate(Player player) {}
 
-  /** Draws every button's icon into the inventory for the given player. */
+  /**
+   * Draws every button's icon into the inventory for the given player.
+   *
+   * @throws IllegalArgumentException If a button is placed outside the inventory.
+   */
   void renderButtons(Player player) {
-    this.buttonMap.forEach(
-        (slot, button) -> {
-          ItemStack icon = button.getIconCreator().apply(player);
-          this.inventory.setItem(slot, icon);
-        });
+    layout.render(player, inventory);
   }
 
-  /**
-   * Redraws all button icons for the registered player without recreating the inventory.
-   */
+  /** Redraws all button icons for the registered player without recreating the inventory. */
   public void refreshButtons() {
     if (registeredPlayer == null || inventory == null) {
       return;
@@ -185,8 +198,7 @@ public abstract class InventoryGUI {
   }
 
   /**
-   * Refreshes a specific button at the given slot. If the button is an IAButton, all slots occupied
-   * by that IAButton are refreshed.
+   * Redraws the button at the given slot, in every slot that button covers.
    *
    * @param slot The slot of the button to refresh.
    */
@@ -194,30 +206,7 @@ public abstract class InventoryGUI {
     if (registeredPlayer == null || inventory == null) {
       return;
     }
-    InventoryButton button = this.buttonMap.get(slot);
-    if (button != null) {
-      ItemStack icon = button.getIconCreator().apply(registeredPlayer);
-
-      // If it's an IAButton, refresh all its occupied slots
-      if (button instanceof IAButton) {
-        IAButton iaButton = (IAButton) button;
-        for (int occupiedSlot : iaButton.getOccupiedSlots()) {
-          this.inventory.setItem(occupiedSlot, icon);
-        }
-      } else {
-        // Regular button, just refresh this slot
-        this.inventory.setItem(slot, icon);
-      }
-    }
-  }
-
-  /**
-   * Gets the button map for advanced manipulation.
-   *
-   * @return The map of slot to InventoryButton.
-   */
-  protected Map<Integer, InventoryButton> getButtonMap() {
-    return buttonMap;
+    layout.render(registeredPlayer, inventory, slot);
   }
 
   /** Cancels the click if it lands in an inventory this GUI does not allow clicks in. */
@@ -236,7 +225,7 @@ public abstract class InventoryGUI {
     if (event.getView().getTopInventory() != event.getClickedInventory()) {
       return;
     }
-    InventoryButton button = this.buttonMap.get(event.getSlot());
+    InventoryButton button = layout.buttonAt(event.getSlot());
     if (button != null && button.getEventConsumer() != null) {
       button.getEventConsumer().accept(event);
     }

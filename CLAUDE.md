@@ -14,7 +14,7 @@ mvn package
 
 Tests use JUnit 5 and MockBukkit-v1.19 (matches `paper-api 1.19.4`). Run one with `mvn test -Dtest=GUIManagerTest#methodName`. `TESTING.md` lists further planned tests.
 
-Formatting follows google-java-format (enabled in `.idea/google-java-format.xml`). Note that `InventoryButton`, `IAButton` and `GUIListener` still use 4-space indentation while the other classes use 2-space; match the file you are editing.
+Formatting follows google-java-format (enabled in `.idea/google-java-format.xml`), 2-space indentation.
 
 ## Architecture
 
@@ -22,7 +22,7 @@ Event flow: Bukkit event -> `GUIListener` -> `GUIManager` (singleton; package-pr
 
 - `GUIManager` owns every session: a `Map<Inventory, InventoryGUI>` for event routing and a UUID-keyed map of sessions (GUI plus its refresh task). `openGUI` calls the GUI's package-private `show(Player)`, checks that the returned inventory is on screen (no session if the open was cancelled), then calls `decorate`, draws the buttons, calls the `onOpen` hook with an event it builds, and starts auto-refresh. Bukkit's own open event is not used. On click it applies the click rules, then `onClick`, then the button handler. On close it calls `onClose`, then `hidden`, stops the task and drops the session. It also exposes `getOpenGUI`, `hasOpenGUI`, `refreshAllGUIsOfType` and `refreshButtonsForType`.
 - `InventoryGUI` (abstract): subclasses implement `createInventory()` and add buttons in `decorate(Player)`. `decorate`, `onOpen`, `onClick` and `onClose` are hooks with empty defaults, so subclasses never need `super`. Package-private methods (`registerPlayer`, `show`, `hidden`, `renderButtons`, `applyClickRules`, `clickButton`) are called only by `GUIManager`. A GUI instance is single-use; `openGUI` throws on a second open.
-- Buttons: `InventoryButton` is a fluent pair of `creator` (`Function<Player, ItemStack>`) and `consumer` (`Consumer<InventoryClickEvent>`). `IAButton` extends it with `size`/`anchor` and is stored in `buttonMap` under every slot from `getOccupiedSlots()`, so `refreshButton(slot)` on any of its slots repaints the whole area.
+- Buttons: `InventoryButton` is a fluent pair of `creator` (`Function<Player, ItemStack>`) and `consumer` (`Consumer<InventoryClickEvent>`). `IAButton` extends it with `size`/`anchor`. `InventoryGUI` delegates placement and drawing to the package-private `ButtonLayout`, which maps slots to buttons, checks slots against the inventory size before drawing, calls each creator once per draw, and redraws or removes a button in every slot it covers.
 - Auto-refresh: the GUI declares it with `enableAutoRefresh(plugin, ticks)` before opening; `GUIManager` runs the `BukkitTask`, which calls the overridable `refreshGUI()` (defaults to `refreshButtons()`) and stops on close, when another GUI opens for that player, when the player goes offline, or after `disableAutoRefresh()`.
 - ItemsAdder: there is no compile-time dependency. `ItemsAdderInventoryGUI` either wraps an existing `Inventory` or overrides `createItemsAdderWrapper(Player)` to return a `TexturedInventoryWrapper` as `Object`. It overrides `show`/`hidden`: `show` calls `showInventory` through reflection (or reuses an inventory already on screen) and shows HUDs, `hidden` hides them. `GUIManager` has no ItemsAdder code. Keep ItemsAdder access reflective so the library still loads without ItemsAdder installed.
 

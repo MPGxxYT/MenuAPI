@@ -408,21 +408,17 @@ public class CustomMenu extends InventoryGUI {
 }
 ```
 
-### Accessing the Button Map
-
-For advanced manipulation of buttons.
+### Finding and Removing Buttons
 
 ```java
 public class AdvancedMenu extends InventoryGUI {
 
   protected void manipulateButtons() {
-    Map<Integer, InventoryButton> buttonMap = getButtonMap();
+    // Remove a button and clear its icon (an IAButton is removed from every slot it covers)
+    removeButton(10);
 
-    // Example: Remove a button
-    buttonMap.remove(10);
-
-    // Example: Check if a slot has a button
-    if (buttonMap.containsKey(13)) {
+    // Check if a slot has a button
+    if (getButton(13) != null) {
       // Do something
     }
   }
