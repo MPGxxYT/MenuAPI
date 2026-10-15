@@ -210,7 +210,27 @@ InventoryGUI gui = manager.getOpenGUI(player);   // null if none open
 manager.refreshButtonsForType(MyMenu.class);
 ```
 
-**Note:** A GUI instance can be opened once. Its session ends when the inventory closes; to show the menu again, open a new instance.
+**Note:** `openGUI` opens a GUI instance once. Its session ends when the inventory closes; to show the same instance again with its current fields, call `rebuild()` on it.
+
+### Rebuilding a GUI
+
+Call `rebuild()` after changing the fields a GUI is drawn from, such as a page number, filter or search query. `createInventory()` and `decorate()` run again on the same instance, and every button is replaced by the ones `decorate()` adds. Managers stored in fields stay where they are, so nothing is passed to a new constructor.
+
+```java
+.consumer(event -> {
+  pageData.setFilter(Filter.next(pageData.getFilter()));
+  rebuild();
+})
+```
+
+- Open GUI, same size: redrawn in the inventory on screen. The cursor stays where it is. A title change alone is not shown.
+- Open GUI, new size: the new inventory opens and the session continues. `onOpen` and `onClose` are not called.
+- Closed GUI (for example after an anvil prompt): opens again as a new session, and `onOpen` is called. Any other GUI the player has open is replaced.
+- Offline player: nothing happens.
+
+Add buttons in `decorate()`, not the constructor, since a rebuild removes every button first. Load data that must stay current in `createInventory()` or `decorate()`; the constructor does not run again. Calling `rebuild()` from inside `createInventory()` or `decorate()` throws `IllegalStateException`.
+
+For an `ItemsAdderInventoryGUI` that wraps an existing inventory, a rebuild redraws its buttons only. One that overrides `createItemsAdderWrapper` gets a new wrapper, shown again.
 
 ---
 
@@ -483,8 +503,8 @@ protected void refreshGUI() {
   // Option 1: Simple refresh (default) - just update button displays
   refreshButtons();
 
-  // Option 2: Full refresh - recreate the entire menu (this session ends automatically)
-  GUIManager.getInstance().openGUI(new PlayMenu(), getRegisteredPlayer());
+  // Option 2: Full refresh - run createInventory() and decorate() again (the session continues)
+  rebuild();
 }
 ```
 
@@ -809,7 +829,7 @@ public class PaginatedMenu extends InventoryGUI {
 ## Troubleshooting
 
 ### Buttons Not Appearing
-- Make sure the buttons are added inside `decorate()` or the constructor, and the GUI was opened with `GUIManager.getInstance().openGUI(...)`
+- Make sure the buttons are added inside `decorate()` (buttons added in the constructor are removed by `rebuild()`), and the GUI was opened with `GUIManager.getInstance().openGUI(...)`
 - Verify that your icon creator is returning a non-null ItemStack
 
 ### Clicks Not Working

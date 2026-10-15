@@ -2,12 +2,15 @@ package me.mortaldev.menuapi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import be.seeseemelk.mockbukkit.MockBukkit;
 import be.seeseemelk.mockbukkit.ServerMock;
 import be.seeseemelk.mockbukkit.entity.PlayerMock;
+import java.util.ArrayList;
+import java.util.List;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -146,6 +149,52 @@ class ItemsAdderInventoryGUITest {
     assertSame(gui, manager.getOpenGUI(player));
     assertEquals(Material.EMERALD, inventory.getItem(10).getType());
     assertSame(inventory, player.getOpenInventory().getTopInventory());
+  }
+
+  @Test
+  void rebuildingAWrapperGUIShowsANewWrapper() {
+    List<FakeWrapper> wrappers = new ArrayList<>();
+    WrapperMenu menu =
+        new WrapperMenu(null) {
+          @Override
+          protected Object createItemsAdderWrapper(Player player) {
+            FakeWrapper wrapper = new FakeWrapper(true, false);
+            wrappers.add(wrapper);
+            return wrapper;
+          }
+        };
+    manager.openGUI(menu, player);
+
+    menu.rebuild();
+
+    assertEquals(2, wrappers.size());
+    assertSame(wrappers.get(1).inventory, player.getOpenInventory().getTopInventory());
+    assertSame(wrappers.get(1).inventory, menu.getInventory());
+    assertEquals(Material.EMERALD, wrappers.get(1).inventory.getItem(10).getType());
+    assertSame(menu, manager.getOpenGUI(player));
+    assertEquals(1, menu.opens);
+  }
+
+  @Test
+  void rebuildingAWrappedInventoryRedrawsItsButtonsInPlace() {
+    Inventory inventory = Bukkit.createInventory(null, 54, "Textured");
+    int[] slot = {10};
+    ItemsAdderInventoryGUI gui =
+        new ItemsAdderInventoryGUI(inventory) {
+          @Override
+          public void decorate(Player player) {
+            addButton(slot[0], new InventoryButton().creator(p -> new ItemStack(Material.EMERALD)));
+          }
+        };
+    manager.openGUI(gui, player);
+
+    slot[0] = 11;
+    gui.rebuild();
+
+    assertSame(inventory, player.getOpenInventory().getTopInventory());
+    assertNull(inventory.getItem(10));
+    assertEquals(Material.EMERALD, inventory.getItem(11).getType());
+    assertSame(gui, manager.getOpenGUI(player));
   }
 
   @Test

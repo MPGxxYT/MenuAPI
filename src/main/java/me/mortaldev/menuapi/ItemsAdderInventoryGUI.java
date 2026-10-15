@@ -142,6 +142,15 @@ public class ItemsAdderInventoryGUI extends InventoryGUI {
     return inventory;
   }
 
+  /**
+   * A wrapped inventory is kept, so a rebuild only redraws its buttons. A GUI that uses a wrapper
+   * returns null, so a rebuild creates a new wrapper and shows it again.
+   */
+  @Override
+  Inventory createRebuildInventory() {
+    return usesWrapper() ? null : getInventory();
+  }
+
   @Override
   void hidden(Player player) {
     setHudsVisible(player, activeHudIds, false);

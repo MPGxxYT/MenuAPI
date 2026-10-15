@@ -138,18 +138,20 @@ Recreate the entire menu with updated data:
 ```java
 @Override
 protected void refreshGUI() {
-  // Opening a new GUI ends this session and its refresh task
+  // Runs createInventory() and decorate() again on this instance.
+  // The session and its refresh task continue.
+  rebuild();
+}
 
-  // Get updated data
+@Override
+public void decorate(Player player) {
+  // Load the data here, not in the constructor, so each rebuild sees the latest
   Set<Lobby> lobbies = LobbyManager.getInstance().getLobbies();
-
-  // Open new menu instance (auto-refresh will restart)
-  GUIManager.getInstance().openGUI(
-      new LobbiesMenu(lobbies),
-      getRegisteredPlayer()
-  );
+  // ... add a button per lobby ...
 }
 ```
+
+If the inventory size is unchanged, the menu is redrawn in place. If it changed, the new inventory opens.
 
 **Use when:**
 - Number of items can change (items added/removed)
@@ -449,8 +451,8 @@ protected void refreshGUI() {
   // Prefer this (efficient)
   refreshButtons();
 
-  // Over this (expensive)
-  GUIManager.getInstance().openGUI(new MyMenu(), getRegisteredPlayer());
+  // Over this (creates a new inventory and runs decorate() again)
+  rebuild();
 }
 ```
 
@@ -582,7 +584,7 @@ protected void refreshGUI() {
 
 **Solutions:**
 - Always stop tasks in `onClose()`
-- Don't create new GUI instances in `refreshGUI()` unless necessary
+- Use `rebuild()` in `refreshGUI()` instead of opening new GUI instances
 - Clear references to old data
 
 ```java
