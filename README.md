@@ -62,6 +62,60 @@ dependencies {
 
 To build from the latest commit on `master`, use the version `master-SNAPSHOT`. Snapshot builds can change without notice.
 
+### Shading
+
+MenuAPI is a library, not a plugin, so the server won't load it on its own. `plugin.yml`'s `libraries` section can't load it either, since that only downloads from Maven Central. Bundle (shade) MenuAPI into your plugin's jar, or the server throws `NoClassDefFoundError` the first time a menu opens.
+
+Relocate it while shading. Relocation moves your copy of MenuAPI into your plugin's own package, so it can't clash with another plugin on the same server that bundles a different MenuAPI version.
+
+**Maven**
+
+```xml
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-shade-plugin</artifactId>
+            <version>3.5.1</version>
+            <executions>
+                <execution>
+                    <phase>package</phase>
+                    <goals>
+                        <goal>shade</goal>
+                    </goals>
+                    <configuration>
+                        <relocations>
+                            <relocation>
+                                <pattern>me.mortaldev.menuapi</pattern>
+                                <shadedPattern>com.example.myplugin.libs.menuapi</shadedPattern>
+                            </relocation>
+                        </relocations>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+</build>
+```
+
+Keep the Paper API dependency at `provided` scope so it isn't bundled too.
+
+**Gradle**
+
+```groovy
+plugins {
+    id 'com.gradleup.shadow' version '8.3.5'
+}
+
+shadowJar {
+    relocate 'me.mortaldev.menuapi', 'com.example.myplugin.libs.menuapi'
+}
+```
+
+Use the jar from `shadowJar` on your server, and keep Paper as `compileOnly`.
+
+Replace `com.example.myplugin` with your plugin's own package. Your code still imports `me.mortaldev.menuapi`; the build rewrites those references in the jar.
+
 ## Quick start
 
 Register the listener once, in your plugin's `onEnable()`:
@@ -228,6 +282,8 @@ manager.refreshAllGUIsOfType(LobbyMenu.class);  // calls refreshGUI() on each
 manager.refreshButtonsForType(LobbyMenu.class); // redraws buttons only
 ```
 
+Call these, along with `openGUI` and `rebuild()`, from the main thread. To use data loaded asynchronously, switch back with `Bukkit.getScheduler().runTask(...)` first.
+
 ### ItemsAdder
 
 Extend `ItemsAdderInventoryGUI` and return a `TexturedInventoryWrapper` from `createItemsAdderWrapper`. Don't call `showInventory` yourself; MenuAPI does that when the menu opens.
@@ -260,24 +316,18 @@ ItemsAdder is called through reflection, so MenuAPI loads on servers without it.
 ## Upgrading from v1
 
 > [!WARNING]
-> v2.0.0 contains breaking changes.
+> v2.0.0 contains breaking changes. The [changelog](CHANGELOG.md#200) lists each one and what to use instead.
 
-- `decorate`, `onOpen`, `onClick` and `onClose` are optional hooks. Calls to `super` are no longer needed, and existing ones do nothing.
-- `InventoryGUI.getOpenGUI`, `hasOpenGUI`, `refreshAllGUIsOfType` and `refreshButtonsForType` are now instance methods on `GUIManager.getInstance()`.
-- `startAutoRefresh` and `stopAutoRefresh` are removed. Use `disableAutoRefresh()` to stop refreshing while a menu stays open.
-- `InventoryHandler`, `registerHandledInventory` and `unregisterInventory` are removed. Open every menu with `GUIManager.getInstance().openGUI(gui, player)`.
-- `GUIManager.handleOpen` is removed, and `onOpen` can no longer cancel the open.
-- `getButtonMap()` is replaced by `getButton(slot)` and `removeButton(slot)`.
-- A menu instance can be opened once.
-- An `IAButton` that runs past the right edge throws instead of being clipped.
-- An ItemsAdder wrapper whose `showInventory` throws without opening anything makes `openGUI` throw `IllegalStateException`.
+Every release's changes are in [CHANGELOG.md](CHANGELOG.md).
 
 ## Documentation
 
+- [Getting started](docs/GETTING_STARTED.md): your first menu, step by step, with best practices
 - [API guide](docs/MENUAPI_GUIDE.md): every feature, with examples
 - [Auto-refresh guide](docs/AUTO_REFRESH_GUIDE.md)
 - [Area buttons (IAButton)](docs/IABUTTON_USAGE.md)
 - [Managing open menus](docs/GLOBAL_GUI_MANAGEMENT.md)
+- [Changelog](CHANGELOG.md)
 - [Testing guide](TESTING.md)
 
 ## Building from source

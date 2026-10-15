@@ -1,6 +1,8 @@
 # MenuAPI Usage Guide
 
-A comprehensive guide to using MenuAPI for creating custom inventory GUIs in Bukkit/Spigot plugins.
+A comprehensive guide to using MenuAPI for creating custom inventory GUIs in Paper plugins.
+
+New to MenuAPI? Start with **[Getting Started](GETTING_STARTED.md)**, which builds a first menu step by step. This guide is the reference for every feature.
 
 ## Table of Contents
 - [Getting Started](#getting-started)
@@ -15,6 +17,7 @@ A comprehensive guide to using MenuAPI for creating custom inventory GUIs in Buk
 - [Best Practices](#best-practices)
 
 ## Additional Guides
+- **[Getting Started](GETTING_STARTED.md)** - Build your first menu step by step, with best practices
 - **[IAButton Usage Guide](IABUTTON_USAGE.md)** - Detailed guide for multi-slot area buttons
 - **[Auto-Refresh Guide](AUTO_REFRESH_GUIDE.md)** - Complete auto-refresh system documentation
 - **[Global GUI Management Guide](GLOBAL_GUI_MANAGEMENT.md)** - Managing multiple GUIs across players
@@ -23,7 +26,7 @@ A comprehensive guide to using MenuAPI for creating custom inventory GUIs in Buk
 
 ## Getting Started
 
-MenuAPI provides a simple, object-oriented way to create custom inventory GUIs with buttons, click handlers, and event management.
+MenuAPI provides a simple, object-oriented way to create custom inventory GUIs with buttons, click handlers, and event management. For a step-by-step walkthrough with best practices, see **[Getting Started](GETTING_STARTED.md)**.
 
 ### Core Components
 
@@ -514,7 +517,7 @@ See **[Auto-Refresh Guide](AUTO_REFRESH_GUIDE.md)** for complete documentation a
 
 ## Global GUI Management
 
-Track and manage all open GUIs across all players with static methods.
+Track and manage all open GUIs across all players with the methods on `GUIManager.getInstance()`. Call them from the main thread.
 
 ### Refreshing All GUIs of a Type
 
@@ -547,7 +550,7 @@ if (gui instanceof PlayMenu) {
 }
 ```
 
-### Available Static Methods
+### Available Methods
 
 - `refreshAllGUIsOfType(Class)` - Full refresh (calls `refreshGUI()`)
 - `refreshButtonsForType(Class)` - Button display refresh only (more efficient)
@@ -620,30 +623,20 @@ public void decorate(Player player) {
 }
 ```
 
-### 4. Cancel Click Events
+### 4. Let MenuAPI Cancel Clicks
+
+Clicks in the menu and in the player's inventory are cancelled by default, and button handlers still run. Handlers don't need `event.setCancelled(true)`. Use `allowTopInventoryClick(true)` or `allowBottomInventoryClick(true)` only for menus where players move items.
+
+### 5. Open the Next Menu Directly
+
+`openGUI` replaces the menu the player has open, and the old menu's `onClose` runs as usual. There's no need to call `closeInventory()` first. To return to the previous menu with its page and filter intact, keep a reference to it and call `rebuild()` on it:
 
 ```java
-.consumer(event -> {
-  // Always cancel the event to prevent item pickup
-  event.setCancelled(true);
+.consumer(event -> GUIManager.getInstance().openGUI(
+    new DetailMenu(item, this), (Player) event.getWhoClicked()))
 
-  // Your logic here
-})
-```
-
-### 5. Close Inventory When Navigating
-
-```java
-.consumer(event -> {
-  event.setCancelled(true);
-  Player player = (Player) event.getWhoClicked();
-
-  // Close the current inventory before opening another
-  player.closeInventory();
-
-  // Then open the new one
-  GUIManager.getInstance().openGUI(new OtherMenu(), player);
-})
+// In DetailMenu's Back button:
+.consumer(event -> previous.rebuild())
 ```
 
 ### 6. Use Method References for Cleaner Code
@@ -738,7 +731,8 @@ public class PaginatedMenu extends InventoryGUI {
 
   @Override
   protected Inventory createInventory() {
-    return Bukkit.createInventory(null, 54, "§6§lPage " + (page + 1));
+    // The title only changes on a rebuild that also changes the size, so it has no page number
+    return Bukkit.createInventory(null, 54, "§6§lItems");
   }
 
   @Override
@@ -786,8 +780,8 @@ public class PaginatedMenu extends InventoryGUI {
         .consumer(event -> {
           event.setCancelled(true);
           page--;
-          // Refresh the GUI with new page
-          refreshButtons();
+          // Runs decorate() again, so the items and arrows match the new page
+          rebuild();
         });
   }
 
@@ -803,7 +797,7 @@ public class PaginatedMenu extends InventoryGUI {
         .consumer(event -> {
           event.setCancelled(true);
           page++;
-          refreshButtons();
+          rebuild();
         });
   }
 
@@ -850,10 +844,10 @@ public class PaginatedMenu extends InventoryGUI {
 
 ## Dependencies
 
-MenuAPI has no external dependencies beyond Bukkit/Spigot API. ItemsAdder integration is optional and only required if you're using `ItemsAdderInventoryGUI`.
+MenuAPI has no external dependencies beyond the Paper API (1.19.4 or later). ItemsAdder integration is optional and only required if you're using `ItemsAdderInventoryGUI`.
 
 ---
 
 ## License
 
-MenuAPI is provided as-is for use in Bukkit/Spigot plugins.
+MenuAPI is provided as-is for use in Paper plugins.
