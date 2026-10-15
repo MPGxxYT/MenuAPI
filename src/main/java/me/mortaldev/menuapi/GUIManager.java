@@ -16,8 +16,8 @@ import org.bukkit.scheduler.BukkitTask;
 
 /**
  * Runs GUI sessions: opens GUIs, tracks which GUI each player has open, draws buttons, applies
- * click rules, and runs auto-refresh. Bukkit inventory events reach it through {@link
- * GUIListener}.
+ * click rules, and runs auto-refresh. Click and close events reach it through {@link GUIListener};
+ * sessions start in {@link #openGUI}.
  */
 public class GUIManager {
 
@@ -53,7 +53,8 @@ public class GUIManager {
   private final Map<UUID, Session> sessions = new HashMap<>();
 
   /**
-   * Opens a GUI for a player.
+   * Opens a GUI for a player and starts its session. If the open is cancelled (for example by
+   * another plugin), no session starts.
    *
    * @param gui The InventoryGUI to open.
    * @param player The player to open the GUI for.
@@ -66,51 +67,13 @@ public class GUIManager {
     }
     gui.registerPlayer(player);
 
-    // Special handling for ItemsAdder GUIs that use wrappers
-    if (gui instanceof ItemsAdderInventoryGUI) {
-      ItemsAdderInventoryGUI iaGUI = (ItemsAdderInventoryGUI) gui;
-      if (iaGUI.usesWrapper()) {
-        // ItemsAdder GUI with wrapper - let it handle opening
-        try {
-          Object wrapper = iaGUI.createItemsAdderWrapper(player);
-          // Use reflection to call showInventory since we can't depend on ItemsAdder
-          wrapper.getClass().getMethod("showInventory", Player.class).invoke(wrapper, player);
-        } catch (NoSuchMethodException e) {
-          throw new RuntimeException(
-              "Failed to open ItemsAdder GUI. The wrapper object doesn't have a showInventory method. Make sure you're returning a TexturedInventoryWrapper from createItemsAdderWrapper()",
-              e);
-        } catch (Exception e) {
-          // GUI opened successfully but there was an issue - suppress error since it's working
-          // This can happen with ItemsAdder's internal processes
-        }
-        // The wrapper opened the inventory before it was registered, so the open event was not
-        // handled; start the session directly.
-        Inventory inventory = player.getOpenInventory().getTopInventory();
-        gui.setInventory(inventory);
-        guisByInventory.put(inventory, gui);
-
-        List<String> hudIds = iaGUI.getHudIds(player);
-        if (!hudIds.isEmpty()) {
-          iaGUI.setActiveHudIds(hudIds);
-          showHuds(player, hudIds);
-        }
-
-        startSession(gui, player, new InventoryOpenEvent(player.getOpenInventory()));
-        return;
-      }
-
-      // Inventory already shown by ItemsAdder: start the session without reopening it
-      Inventory inventory = gui.getInventory();
-      if (player.getOpenInventory().getTopInventory() == inventory) {
-        guisByInventory.put(inventory, gui);
-        startSession(gui, player, new InventoryOpenEvent(player.getOpenInventory()));
-        return;
-      }
+    Inventory inventory = gui.show(player);
+    if (inventory == null || player.getOpenInventory().getTopInventory() != inventory) {
+      // The open was cancelled, for example by another plugin
+      return;
     }
-
-    // Standard GUI opening; the open event starts the session
-    guisByInventory.put(gui.getInventory(), gui);
-    player.openInventory(gui.getInventory());
+    guisByInventory.put(inventory, gui);
+    startSession(gui, player, new InventoryOpenEvent(player.getOpenInventory()));
   }
 
   /**
@@ -188,19 +151,6 @@ public class GUIManager {
   }
 
   /**
-   * Starts the session for a GUI opened through {@link #openGUI}.
-   *
-   * @param event The InventoryOpenEvent.
-   */
-  public void handleOpen(InventoryOpenEvent event) {
-    InventoryGUI gui = guisByInventory.get(event.getInventory());
-    if (gui == null) {
-      return;
-    }
-    startSession(gui, (Player) event.getPlayer(), event);
-  }
-
-  /**
    * Calls the GUI's onClose hook and ends its session.
    *
    * @param event The InventoryCloseEvent.
@@ -213,16 +163,8 @@ public class GUIManager {
     }
     Player player = (Player) event.getPlayer();
 
-    // Hide HUDs for ItemsAdder GUIs
-    if (gui instanceof ItemsAdderInventoryGUI) {
-      ItemsAdderInventoryGUI iaGUI = (ItemsAdderInventoryGUI) gui;
-      List<String> hudIds = iaGUI.getActiveHudIds();
-      if (!hudIds.isEmpty()) {
-        hideHuds(player, hudIds);
-      }
-    }
-
     gui.onClose(event);
+    gui.hidden(player);
 
     Session session = sessions.get(player.getUniqueId());
     if (session != null && session.gui == gui) {
@@ -267,58 +209,5 @@ public class GUIManager {
                 },
                 interval,
                 interval);
-  }
-
-  /**
-   * Shows HUDs for a player using reflection to avoid ItemsAdder dependency.
-   *
-   * @param player The player to show HUDs for.
-   * @param hudIds List of HUD namespace IDs to show.
-   */
-  private void showHuds(Player player, List<String> hudIds) {
-    try {
-      // PlayerHudsHolderWrapper hudsHolder = new PlayerHudsHolderWrapper(player);
-      Class<?> holderClass =
-          Class.forName("dev.lone.itemsadder.api.FontImages.PlayerHudsHolderWrapper");
-      Object hudsHolder = holderClass.getConstructor(Player.class).newInstance(player);
-
-      for (String hudId : hudIds) {
-        // PlayerQuantityHudWrapper hud = hudsHolder.getHud(hudId);
-        Object hud = holderClass.getMethod("getHud", String.class).invoke(hudsHolder, hudId);
-        if (hud != null) {
-          // hud.show();
-          hud.getClass().getMethod("show").invoke(hud);
-        }
-      }
-    } catch (Exception e) {
-      // Silently fail if ItemsAdder classes not found or HUD doesn't exist
-      // This is expected if ItemsAdder is not installed or HUD is not configured
-    }
-  }
-
-  /**
-   * Hides HUDs for a player using reflection to avoid ItemsAdder dependency.
-   *
-   * @param player The player to hide HUDs for.
-   * @param hudIds List of HUD namespace IDs to hide.
-   */
-  private void hideHuds(Player player, List<String> hudIds) {
-    try {
-      // PlayerHudsHolderWrapper hudsHolder = new PlayerHudsHolderWrapper(player);
-      Class<?> holderClass =
-          Class.forName("dev.lone.itemsadder.api.FontImages.PlayerHudsHolderWrapper");
-      Object hudsHolder = holderClass.getConstructor(Player.class).newInstance(player);
-
-      for (String hudId : hudIds) {
-        // PlayerQuantityHudWrapper hud = hudsHolder.getHud(hudId);
-        Object hud = holderClass.getMethod("getHud", String.class).invoke(hudsHolder, hudId);
-        if (hud != null) {
-          // hud.hide();
-          hud.getClass().getMethod("hide").invoke(hud);
-        }
-      }
-    } catch (Exception e) {
-      // Silently fail if ItemsAdder classes not found or HUD doesn't exist
-    }
   }
 }

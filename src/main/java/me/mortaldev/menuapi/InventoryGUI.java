@@ -92,6 +92,20 @@ public abstract class InventoryGUI {
   }
 
   /**
+   * Puts this GUI's inventory on screen for the player. Called by {@link GUIManager#openGUI}.
+   *
+   * @return The inventory now on screen, or null if nothing was opened.
+   */
+  Inventory show(Player player) {
+    Inventory inventory = getInventory();
+    player.openInventory(inventory);
+    return inventory;
+  }
+
+  /** Called by {@link GUIManager} when this GUI closes, after the onClose hook. */
+  void hidden(Player player) {}
+
+  /**
    * Sets whether clicks in the player's bottom inventory are allowed.
    *
    * @param b True to allow clicks, false to cancel them.
@@ -237,8 +251,8 @@ public abstract class InventoryGUI {
   public void onClick(InventoryClickEvent event) {}
 
   /**
-   * Hook called after the GUI has opened and its buttons have been drawn. The default
-   * implementation does nothing.
+   * Hook called after the GUI has opened and its buttons have been drawn. The inventory is already
+   * on screen, so cancelling the event has no effect. The default implementation does nothing.
    *
    * @param event The InventoryOpenEvent.
    */

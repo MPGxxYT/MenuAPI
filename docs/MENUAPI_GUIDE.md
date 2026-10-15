@@ -396,7 +396,7 @@ public class CustomMenu extends InventoryGUI {
 
   @Override
   public void onOpen(InventoryOpenEvent event) {
-    // Custom open logic
+    // Custom open logic; the inventory is already on screen, so the open can't be cancelled here
     event.getPlayer().sendMessage("§aWelcome to the menu!");
   }
 

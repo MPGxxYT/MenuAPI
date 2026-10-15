@@ -4,7 +4,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.event.inventory.InventoryOpenEvent;
 
 /**
  * Listens for Bukkit inventory events and delegates them to the {@link GUIManager}.
@@ -31,17 +30,6 @@ public class GUIListener implements Listener {
     @EventHandler
     public void onClick(InventoryClickEvent event) {
         this.guiManager.handleClick(event); //
-    }
-
-    /**
-     * Handles inventory open events. This method is called by the Bukkit event system
-     * when an inventory is opened. It delegates the handling to the {@link GUIManager}.
-     *
-     * @param event The InventoryOpenEvent.
-     */
-    @EventHandler
-    public void onOpen(InventoryOpenEvent event) {
-        this.guiManager.handleOpen(event); //
     }
 
     /**

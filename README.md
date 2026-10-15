@@ -76,6 +76,8 @@ v2 moves the session lifecycle into `GUIManager`:
 - `startAutoRefresh` and `stopAutoRefresh` are removed; the refresh task stops when the GUI closes or another GUI opens. Use `disableAutoRefresh()` to stop it while the GUI stays open.
 - `InventoryHandler`, `registerHandledInventory` and `unregisterInventory` are removed. Open every GUI with `GUIManager.getInstance().openGUI(gui, player)`.
 - A GUI instance can be opened once; opening it again throws `IllegalStateException`.
+- `onOpen` runs after the inventory is on screen, so cancelling its event no longer cancels the open. `GUIManager.handleOpen` is removed.
+- An ItemsAdder wrapper whose `showInventory` throws without opening anything now makes `openGUI` throw `IllegalStateException` instead of continuing silently.
 
 ## Setup
 
@@ -345,7 +347,7 @@ public class MyMenu extends InventoryGUI {
 
     @Override
     public void onOpen(InventoryOpenEvent event) {
-        // Called when GUI opens
+        // Called after the GUI opens and its buttons are drawn (too late to cancel the open)
     }
 
     @Override
