@@ -1,5 +1,7 @@
 # MenuAPI - Testing Guide
 
+> **Current state:** `pom.xml` includes JUnit 5, MockBukkit-v1.19 3.1.0 (built against `paper-api 1.19.4`) and surefire. `GUIManagerTest` covers the session lifecycle: opening, click rules, closing, auto-refresh and refresh-by-type. The rest of this guide is the plan for further tests; Mockito is not added yet.
+
 ## Test Setup
 
 ### Dependencies (pom.xml)
@@ -31,8 +33,8 @@
     <!-- MockBukkit - Required for most MenuAPI tests -->
     <dependency>
         <groupId>com.github.seeseemelk</groupId>
-        <artifactId>MockBukkit-v1.20</artifactId>
-        <version>3.80.0</version>
+        <artifactId>MockBukkit-v1.19</artifactId>
+        <version>3.1.0</version>
         <scope>test</scope>
     </dependency>
 </dependencies>
@@ -618,7 +620,6 @@ public class TestMenu extends InventoryGUI {
         addButton(0, new InventoryButton()
             .creator(p -> new ItemStack(Material.DIAMOND))
             .consumer(e -> e.setCancelled(true)));
-        super.decorate(player);
     }
 }
 ```

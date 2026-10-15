@@ -37,7 +37,7 @@ MenuAPI automatically tracks which GUI each player has open.
 ```java
 Player player = /* ... */;
 
-if (InventoryGUI.hasOpenGUI(player)) {
+if (GUIManager.getInstance().hasOpenGUI(player)) {
   player.sendMessage("§cYou already have a menu open!");
   return;
 }
@@ -50,7 +50,7 @@ GUIManager.getInstance().openGUI(new MyMenu(), player);
 
 ```java
 Player player = /* ... */;
-InventoryGUI gui = InventoryGUI.getOpenGUI(player);
+InventoryGUI gui = GUIManager.getInstance().getOpenGUI(player);
 
 if (gui == null) {
   player.sendMessage("§cYou don't have any menu open!");
@@ -68,7 +68,7 @@ if (gui instanceof PlayMenu) {
 ### Type-Safe GUI Retrieval
 
 ```java
-InventoryGUI gui = InventoryGUI.getOpenGUI(player);
+InventoryGUI gui = GUIManager.getInstance().getOpenGUI(player);
 
 if (gui instanceof LobbyMenu) {
   LobbyMenu lobbyMenu = (LobbyMenu) gui;
@@ -89,7 +89,7 @@ Calls `refreshGUI()` on all matching GUI instances:
 
 ```java
 // Refresh all open LobbiesMenu instances
-InventoryGUI.refreshAllGUIsOfType(LobbiesMenu.class);
+GUIManager.getInstance().refreshAllGUIsOfType(LobbiesMenu.class);
 ```
 
 **Use when:**
@@ -103,7 +103,7 @@ More efficient - only updates button displays:
 
 ```java
 // Just update button displays on all PlayMenu instances
-InventoryGUI.refreshButtonsForType(PlayMenu.class);
+GUIManager.getInstance().refreshButtonsForType(PlayMenu.class);
 ```
 
 **Use when:**
@@ -129,19 +129,19 @@ public class LobbyManager {
     lobbies.add(lobby);
 
     // Refresh all open lobby list menus
-    InventoryGUI.refreshAllGUIsOfType(LobbiesMenu.class);
+    GUIManager.getInstance().refreshAllGUIsOfType(LobbiesMenu.class);
   }
 
   public void deleteLobby(Lobby lobby) {
     lobbies.remove(lobby);
 
     // Refresh all open lobby list menus
-    InventoryGUI.refreshAllGUIsOfType(LobbiesMenu.class);
+    GUIManager.getInstance().refreshAllGUIsOfType(LobbiesMenu.class);
   }
 
   public void updateLobby(Lobby lobby) {
     // Just update displays, structure hasn't changed
-    InventoryGUI.refreshButtonsForType(LobbiesMenu.class);
+    GUIManager.getInstance().refreshButtonsForType(LobbiesMenu.class);
   }
 }
 ```
@@ -154,19 +154,19 @@ Update player-related GUIs when players join or leave:
 @EventHandler
 public void onPlayerJoin(PlayerJoinEvent event) {
   // Update all play menus to show new player count
-  InventoryGUI.refreshButtonsForType(PlayMenu.class);
+  GUIManager.getInstance().refreshButtonsForType(PlayMenu.class);
 
   // Update all lobby menus
-  InventoryGUI.refreshButtonsForType(LobbyMenu.class);
+  GUIManager.getInstance().refreshButtonsForType(LobbyMenu.class);
 }
 
 @EventHandler
 public void onPlayerQuit(PlayerQuitEvent event) {
   // Update all play menus to show new player count
-  InventoryGUI.refreshButtonsForType(PlayMenu.class);
+  GUIManager.getInstance().refreshButtonsForType(PlayMenu.class);
 
   // Update all lobby menus
-  InventoryGUI.refreshButtonsForType(LobbyMenu.class);
+  GUIManager.getInstance().refreshButtonsForType(LobbyMenu.class);
 }
 ```
 
@@ -181,17 +181,17 @@ public class Game {
     this.status = GameStatus.IN_PROGRESS;
 
     // Refresh all lobby browsers to show game started
-    InventoryGUI.refreshButtonsForType(GameBrowserMenu.class);
+    GUIManager.getInstance().refreshButtonsForType(GameBrowserMenu.class);
 
     // Update spectator menus
-    InventoryGUI.refreshButtonsForType(SpectateMenu.class);
+    GUIManager.getInstance().refreshButtonsForType(SpectateMenu.class);
   }
 
   public void end() {
     this.status = GameStatus.ENDED;
 
     // Full refresh needed - player list changed
-    InventoryGUI.refreshAllGUIsOfType(GameBrowserMenu.class);
+    GUIManager.getInstance().refreshAllGUIsOfType(GameBrowserMenu.class);
   }
 }
 ```
@@ -205,7 +205,7 @@ public void grantPermission(Player player, String permission) {
   player.addAttachment(plugin).setPermission(permission, true);
 
   // Check if this player has a menu open
-  InventoryGUI gui = InventoryGUI.getOpenGUI(player);
+  InventoryGUI gui = GUIManager.getInstance().getOpenGUI(player);
 
   if (gui != null) {
     // Refresh their specific GUI
@@ -222,8 +222,8 @@ Prevent players from opening multiple GUIs:
 ```java
 public void openPlayMenu(Player player) {
   // Check if player already has a GUI open
-  if (InventoryGUI.hasOpenGUI(player)) {
-    InventoryGUI current = InventoryGUI.getOpenGUI(player);
+  if (GUIManager.getInstance().hasOpenGUI(player)) {
+    InventoryGUI current = GUIManager.getInstance().getOpenGUI(player);
 
     if (current instanceof PlayMenu) {
       player.sendMessage("§cYou already have the play menu open!");
@@ -254,11 +254,11 @@ public class Shop {
     items.put(itemId, newItem);
 
     // Only refresh shop menus, not other GUIs
-    InventoryGUI.refreshButtonsForType(ShopMenu.class);
+    GUIManager.getInstance().refreshButtonsForType(ShopMenu.class);
 
     // Also update player's personal shop if they have it open
     for (Player player : Bukkit.getOnlinePlayers()) {
-      InventoryGUI gui = InventoryGUI.getOpenGUI(player);
+      InventoryGUI gui = GUIManager.getInstance().getOpenGUI(player);
 
       if (gui instanceof PersonalShopMenu) {
         PersonalShopMenu shop = (PersonalShopMenu) gui;
@@ -285,9 +285,9 @@ public class BulkDataUpdater {
     updatePlayers();
 
     // Single refresh at the end instead of multiple refreshes
-    InventoryGUI.refreshAllGUIsOfType(DashboardMenu.class);
-    InventoryGUI.refreshButtonsForType(LobbiesMenu.class);
-    InventoryGUI.refreshButtonsForType(GamesMenu.class);
+    GUIManager.getInstance().refreshAllGUIsOfType(DashboardMenu.class);
+    GUIManager.getInstance().refreshButtonsForType(LobbiesMenu.class);
+    GUIManager.getInstance().refreshButtonsForType(GamesMenu.class);
   }
 }
 ```
@@ -302,7 +302,7 @@ public class RankManager {
 
     // Refresh menus that display ranks
     for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
-      InventoryGUI gui = InventoryGUI.getOpenGUI(onlinePlayer);
+      InventoryGUI gui = GUIManager.getInstance().getOpenGUI(onlinePlayer);
 
       if (gui instanceof PlayerListMenu) {
         // Only refresh if they're viewing the updated player
@@ -331,7 +331,7 @@ public class NotificationManager {
     Set<Player> affectedPlayers = new HashSet<>();
 
     for (Player player : Bukkit.getOnlinePlayers()) {
-      InventoryGUI gui = InventoryGUI.getOpenGUI(player);
+      InventoryGUI gui = GUIManager.getInstance().getOpenGUI(player);
 
       if (gui != null && guiClass.isInstance(gui)) {
         affectedPlayers.add(player);
@@ -339,7 +339,7 @@ public class NotificationManager {
     }
 
     // Refresh the GUIs
-    InventoryGUI.refreshButtonsForType(guiClass);
+    GUIManager.getInstance().refreshButtonsForType(guiClass);
 
     // Notify affected players
     for (Player player : affectedPlayers) {
@@ -365,10 +365,10 @@ public class SyncManager {
 
   public void syncAllGameMenus() {
     // Refresh all game-related GUIs together
-    InventoryGUI.refreshButtonsForType(GameBrowserMenu.class);
-    InventoryGUI.refreshButtonsForType(LobbyMenu.class);
-    InventoryGUI.refreshButtonsForType(QueueMenu.class);
-    InventoryGUI.refreshButtonsForType(SpectateMenu.class);
+    GUIManager.getInstance().refreshButtonsForType(GameBrowserMenu.class);
+    GUIManager.getInstance().refreshButtonsForType(LobbyMenu.class);
+    GUIManager.getInstance().refreshButtonsForType(QueueMenu.class);
+    GUIManager.getInstance().refreshButtonsForType(SpectateMenu.class);
   }
 
   public void onGameStart(Game game) {
@@ -376,7 +376,7 @@ public class SyncManager {
 
     // Notify players viewing game menus
     for (Player player : Bukkit.getOnlinePlayers()) {
-      InventoryGUI gui = InventoryGUI.getOpenGUI(player);
+      InventoryGUI gui = GUIManager.getInstance().getOpenGUI(player);
 
       if (gui instanceof GameBrowserMenu) {
         player.sendMessage("§aGame " + game.getName() + " has started!");
@@ -394,10 +394,10 @@ public class SyncManager {
 
 ```java
 // Prefer this (efficient)
-InventoryGUI.refreshButtonsForType(MyMenu.class);
+GUIManager.getInstance().refreshButtonsForType(MyMenu.class);
 
 // Over this (expensive)
-InventoryGUI.refreshAllGUIsOfType(MyMenu.class);
+GUIManager.getInstance().refreshAllGUIsOfType(MyMenu.class);
 ```
 
 Only use `refreshAllGUIsOfType()` when the structure changes (items added/removed).
@@ -407,17 +407,17 @@ Only use `refreshAllGUIsOfType()` when the structure changes (items added/remove
 ```java
 // Bad - multiple refreshes
 updateData1();
-InventoryGUI.refreshButtonsForType(MyMenu.class);
+GUIManager.getInstance().refreshButtonsForType(MyMenu.class);
 updateData2();
-InventoryGUI.refreshButtonsForType(MyMenu.class);
+GUIManager.getInstance().refreshButtonsForType(MyMenu.class);
 updateData3();
-InventoryGUI.refreshButtonsForType(MyMenu.class);
+GUIManager.getInstance().refreshButtonsForType(MyMenu.class);
 
 // Good - single refresh
 updateData1();
 updateData2();
 updateData3();
-InventoryGUI.refreshButtonsForType(MyMenu.class);
+GUIManager.getInstance().refreshButtonsForType(MyMenu.class);
 ```
 
 ### 3. Check Before Refreshing
@@ -430,14 +430,14 @@ public void updateLobby(Lobby lobby) {
   // Only refresh if someone is actually viewing
   boolean hasViewers = false;
   for (Player player : Bukkit.getOnlinePlayers()) {
-    if (InventoryGUI.getOpenGUI(player) instanceof LobbiesMenu) {
+    if (GUIManager.getInstance().getOpenGUI(player) instanceof LobbiesMenu) {
       hasViewers = true;
       break;
     }
   }
 
   if (hasViewers) {
-    InventoryGUI.refreshButtonsForType(LobbiesMenu.class);
+    GUIManager.getInstance().refreshButtonsForType(LobbiesMenu.class);
   }
 }
 ```
@@ -446,17 +446,17 @@ public void updateLobby(Lobby lobby) {
 
 ```java
 // Good - specific types
-InventoryGUI.refreshButtonsForType(LobbiesMenu.class);
-InventoryGUI.refreshButtonsForType(PlayMenu.class);
+GUIManager.getInstance().refreshButtonsForType(LobbiesMenu.class);
+GUIManager.getInstance().refreshButtonsForType(PlayMenu.class);
 
 // Bad - refreshing base class
-InventoryGUI.refreshButtonsForType(InventoryGUI.class); // Refreshes ALL GUIs!
+GUIManager.getInstance().refreshButtonsForType(InventoryGUI.class); // Refreshes ALL GUIs!
 ```
 
 ### 5. Handle Null GUIs
 
 ```java
-InventoryGUI gui = InventoryGUI.getOpenGUI(player);
+InventoryGUI gui = GUIManager.getInstance().getOpenGUI(player);
 
 // Always check for null
 if (gui == null) {
@@ -483,7 +483,7 @@ public class SmartMenu extends InventoryGUI {
 
   // Also support global refresh
   public static void refreshAll() {
-    InventoryGUI.refreshButtonsForType(SmartMenu.class);
+    GUIManager.getInstance().refreshButtonsForType(SmartMenu.class);
   }
 }
 
@@ -500,16 +500,16 @@ SmartMenu.refreshAll();
 
 ```java
 // Refresh all GUIs of a type (calls refreshGUI())
-InventoryGUI.refreshAllGUIsOfType(Class<? extends InventoryGUI> guiClass)
+GUIManager.getInstance().refreshAllGUIsOfType(Class<? extends InventoryGUI> guiClass)
 
 // Refresh buttons only (calls refreshButtons())
-InventoryGUI.refreshButtonsForType(Class<? extends InventoryGUI> guiClass)
+GUIManager.getInstance().refreshButtonsForType(Class<? extends InventoryGUI> guiClass)
 
 // Get player's open GUI
-InventoryGUI.getOpenGUI(Player player)  // Returns null if none open
+GUIManager.getInstance().getOpenGUI(Player player)  // Returns null if none open
 
 // Check if player has GUI open
-InventoryGUI.hasOpenGUI(Player player)  // Returns boolean
+GUIManager.getInstance().hasOpenGUI(Player player)  // Returns boolean
 ```
 
 ### When to Use Each Method
@@ -538,7 +538,7 @@ InventoryGUI.hasOpenGUI(Player player)  // Returns boolean
 ```java
 // If calling from async context
 Bukkit.getScheduler().runTask(plugin, () -> {
-  InventoryGUI.refreshButtonsForType(MyMenu.class);
+  GUIManager.getInstance().refreshButtonsForType(MyMenu.class);
 });
 ```
 
@@ -563,10 +563,10 @@ Bukkit.getScheduler().runTask(plugin, () -> {
 
 ```java
 // Too broad - refreshes ALL GUIs
-InventoryGUI.refreshButtonsForType(InventoryGUI.class);
+GUIManager.getInstance().refreshButtonsForType(InventoryGUI.class);
 
 // Specific - only refreshes PlayMenu
-InventoryGUI.refreshButtonsForType(PlayMenu.class);
+GUIManager.getInstance().refreshButtonsForType(PlayMenu.class);
 ```
 
 ---

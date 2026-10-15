@@ -41,7 +41,7 @@ Then add the dependency:
 <dependency>
     <groupId>com.github.MPGxxYT</groupId>
     <artifactId>MenuAPI</artifactId>
-    <version>v1.0.0</version>
+    <version>v2.0.0</version>
 </dependency>
 ```
 
@@ -53,7 +53,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.MPGxxYT:MenuAPI:v1.0.0'
+    implementation 'com.github.MPGxxYT:MenuAPI:v2.0.0'
 }
 ```
 
@@ -66,6 +66,16 @@ For the latest development version:
 ```
 
 Note: SNAPSHOT versions may change without notice.
+
+## Upgrading from v1
+
+v2 moves the session lifecycle into `GUIManager`:
+
+- `decorate`, `onOpen`, `onClick` and `onClose` are optional hooks. Calls to `super` are no longer needed (existing ones are harmless).
+- `InventoryGUI.getOpenGUI`, `hasOpenGUI`, `refreshAllGUIsOfType` and `refreshButtonsForType` are now instance methods on `GUIManager.getInstance()`.
+- `startAutoRefresh` and `stopAutoRefresh` are removed; the refresh task stops when the GUI closes or another GUI opens. Use `disableAutoRefresh()` to stop it while the GUI stays open.
+- `InventoryHandler`, `registerHandledInventory` and `unregisterInventory` are removed. Open every GUI with `GUIManager.getInstance().openGUI(gui, player)`.
+- A GUI instance can be opened once; opening it again throws `IllegalStateException`.
 
 ## Setup
 
@@ -115,7 +125,6 @@ public class MainMenu extends InventoryGUI {
                 clicker.sendMessage("Button clicked!");
             }));
 
-        super.decorate(player);
     }
 }
 ```
@@ -190,8 +199,8 @@ GUIManager manager = GUIManager.getInstance();
 manager.openGUI(new MyMenu(), player);
 
 // Check if player has a GUI open
-if (InventoryGUI.hasOpenGUI(player)) {
-    InventoryGUI gui = InventoryGUI.getOpenGUI(player);
+if (GUIManager.getInstance().hasOpenGUI(player)) {
+    InventoryGUI gui = GUIManager.getInstance().getOpenGUI(player);
 }
 ```
 
@@ -230,7 +239,6 @@ public class LiveStatsMenu extends InventoryGUI {
             })
             .consumer(e -> e.setCancelled(true)));
 
-        super.decorate(player);
     }
 }
 ```
@@ -248,10 +256,10 @@ Refresh all instances of a specific menu type across all players:
 
 ```java
 // Refresh entire GUI (re-runs decorate)
-InventoryGUI.refreshAllGUIsOfType(LobbyMenu.class);
+GUIManager.getInstance().refreshAllGUIsOfType(LobbyMenu.class);
 
 // Refresh only button displays (more efficient)
-InventoryGUI.refreshButtonsForType(LobbyMenu.class);
+GUIManager.getInstance().refreshButtonsForType(LobbyMenu.class);
 ```
 
 </details>
@@ -314,7 +322,6 @@ public class CustomTextureMenu extends ItemsAdderInventoryGUI {
     @Override
     public void decorate(Player player) {
         addButton(10, myButton());
-        super.decorate(player);
     }
 }
 ```

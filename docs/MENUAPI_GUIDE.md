@@ -53,8 +53,6 @@ public class MyMenu extends InventoryGUI {
     addButton(10, createMyButton());
     addButton(13, createAnotherButton());
 
-    // Don't forget to call super.decorate(player)
-    super.decorate(player);
   }
 
   private InventoryButton createMyButton() {
@@ -205,20 +203,14 @@ The `GUIManager` is a singleton that handles all GUI operations and event routin
 GUIManager.getInstance().openGUI(new MyMenu(), player);
 ```
 
-### Registering a Custom Inventory
-If you need to manually register an inventory (advanced usage):
+### Finding and Refreshing Open GUIs
 ```java
-Inventory inventory = /* your inventory */;
-InventoryHandler handler = /* your handler */;
-GUIManager.getInstance().registerHandledInventory(inventory, handler);
+GUIManager manager = GUIManager.getInstance();
+InventoryGUI gui = manager.getOpenGUI(player);   // null if none open
+manager.refreshButtonsForType(MyMenu.class);
 ```
 
-### Unregistering an Inventory
-```java
-GUIManager.getInstance().unregisterInventory(inventory);
-```
-
-**Note:** GUIs are automatically unregistered when the inventory is closed.
+**Note:** A GUI instance can be opened once. Its session ends when the inventory closes; to show the menu again, open a new instance.
 
 ---
 
@@ -252,7 +244,6 @@ public class MyItemsAdderMenu extends ItemsAdderInventoryGUI {
     // Multiple slots example
     addButton(createBorderButton(), 0, 1, 2, 3, 4, 5, 6, 7, 8);
 
-    super.decorate(player);
   }
 
   private InventoryButton createPlayButton() {
@@ -327,11 +318,8 @@ InventoryButton button = new InventoryButton()
 
 gui.addButton(button, 10, 11, 12);
 
-// Register with GUIManager
-GUIManager.getInstance().registerHandledInventory(inventory, gui);
-
-// Decorate the inventory
-gui.decorate(player);
+// Start the session; the inventory is already open, so it is not reopened
+GUIManager.getInstance().openGUI(gui, player);
 ```
 
 ---
@@ -388,7 +376,6 @@ public void decorate(Player player) {
   Player registeredPlayer = getRegisteredPlayer();
 
   // ... add buttons
-  super.decorate(player);
 }
 ```
 
@@ -404,21 +391,17 @@ public class CustomMenu extends InventoryGUI {
     // Custom click handling
     Player player = (Player) event.getWhoClicked();
     player.sendMessage("You clicked slot " + event.getSlot());
-
-    // Call super to maintain button functionality
-    super.onClick(event);
+    // Click rules have already been applied; the button handler runs after this
   }
 
   @Override
   public void onOpen(InventoryOpenEvent event) {
-    super.onOpen(event);
     // Custom open logic
     event.getPlayer().sendMessage("§aWelcome to the menu!");
   }
 
   @Override
   public void onClose(InventoryCloseEvent event) {
-    super.onClose(event);
     // Custom close logic
     event.getPlayer().sendMessage("§cMenu closed!");
   }
@@ -472,7 +455,6 @@ public class PlayMenu extends InventoryGUI {
   public void decorate(Player player) {
     // Add buttons that show dynamic data
     addButton(10, playerCountButton());
-    super.decorate(player);
   }
 
   // This button will auto-refresh every 2 seconds
@@ -505,8 +487,7 @@ protected void refreshGUI() {
   // Option 1: Simple refresh (default) - just update button displays
   refreshButtons();
 
-  // Option 2: Full refresh - recreate the entire menu
-  stopAutoRefresh();
+  // Option 2: Full refresh - recreate the entire menu (this session ends automatically)
   GUIManager.getInstance().openGUI(new PlayMenu(), getRegisteredPlayer());
 }
 ```
@@ -529,7 +510,7 @@ public class LobbyManager {
     // ... create lobby logic ...
 
     // Refresh all open LobbiesMenu instances
-    InventoryGUI.refreshAllGUIsOfType(LobbiesMenu.class);
+    GUIManager.getInstance().refreshAllGUIsOfType(LobbiesMenu.class);
   }
 }
 ```
@@ -538,13 +519,13 @@ public class LobbyManager {
 
 ```java
 // Check if a player has a GUI open
-if (InventoryGUI.hasOpenGUI(player)) {
+if (GUIManager.getInstance().hasOpenGUI(player)) {
   player.sendMessage("You already have a menu open!");
   return;
 }
 
 // Get the specific GUI a player has open
-InventoryGUI gui = InventoryGUI.getOpenGUI(player);
+InventoryGUI gui = GUIManager.getInstance().getOpenGUI(player);
 if (gui instanceof PlayMenu) {
   player.sendMessage("You're viewing the play menu!");
 }
@@ -573,7 +554,6 @@ public class WellOrganizedMenu extends InventoryGUI {
     addButton(10, playButton());
     addButton(13, settingsButton());
     addButton(16, quitButton());
-    super.decorate(player);
   }
 
   private InventoryButton playButton() {
@@ -610,19 +590,17 @@ public class MyMenu extends InventoryGUI {
     addButton(SLOT_PLAY, playButton());
     addButton(SLOT_SETTINGS, settingsButton());
     addButton(SLOT_QUIT, quitButton());
-    super.decorate(player);
   }
 }
 ```
 
-### 3. Always Call super.decorate(player)
+### 3. Only Add Buttons in decorate()
 
 ```java
 @Override
 public void decorate(Player player) {
   addButton(10, myButton());
-  // This is required to actually place the buttons in the inventory
-  super.decorate(player);
+  // GUIManager draws the buttons after decorate() returns; no super call needed
 }
 ```
 
@@ -684,7 +662,6 @@ public class GameModeMenu extends InventoryGUI {
     addButton(13, gameModeButton(GameMode.CREATIVE));
     addButton(15, gameModeButton(GameMode.ADVENTURE));
     addButton(22, closeButton());
-    super.decorate(player);
   }
 
   private InventoryButton gameModeButton(GameMode mode) {
@@ -770,7 +747,6 @@ public class PaginatedMenu extends InventoryGUI {
     }
 
     addButton(49, closeButton());
-    super.decorate(player);
   }
 
   private InventoryButton itemButton(ItemStack item) {
@@ -837,7 +813,7 @@ public class PaginatedMenu extends InventoryGUI {
 ## Troubleshooting
 
 ### Buttons Not Appearing
-- Make sure you're calling `super.decorate(player)` at the end of your `decorate()` method
+- Make sure the buttons are added inside `decorate()` or the constructor, and the GUI was opened with `GUIManager.getInstance().openGUI(...)`
 - Verify that your icon creator is returning a non-null ItemStack
 
 ### Clicks Not Working

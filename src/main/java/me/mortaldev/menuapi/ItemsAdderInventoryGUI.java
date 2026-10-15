@@ -23,8 +23,8 @@ import org.bukkit.inventory.Inventory;
  *     .creator(p -> yourItemStack)
  *     .consumer(e -> yourClickHandler));
  *
- * // Register with GUIManager
- * GUIManager.getInstance().registerHandledInventory(inventory, gui);
+ * // Start the session; the inventory is already open, so it is not reopened
+ * GUIManager.getInstance().openGUI(gui, player);
  * </pre>
  *
  * 2. Extend this class and override {@link #createItemsAdderWrapper(Player)} to create a custom menu class:
@@ -40,7 +40,6 @@ import org.bukkit.inventory.Inventory;
  *   {@literal @}Override
  *   public void decorate(Player player) {
  *     addButton(10, myButton());
- *     super.decorate(player);
  *   }
  * }
  *
