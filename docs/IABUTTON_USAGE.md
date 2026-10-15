@@ -65,7 +65,6 @@ public class PlayMenu extends InventoryGUI {
     addButton(createGamemodeButton(Gamemode.TDM, 3));
     addButton(createGamemodeButton(Gamemode.KOTH, 6));
 
-    super.decorate(player);
   }
 
   private IAButton createGamemodeButton(Gamemode mode, int anchorSlot) {
@@ -204,7 +203,6 @@ public class DynamicPlayMenu extends InventoryGUI {
         .consumer(event -> event.setCancelled(true));
 
     addButton(statusButton);
-    super.decorate(player);
   }
 
   // When auto-refresh triggers, ALL slots (0,1,2,9,10,11) update together
@@ -240,7 +238,6 @@ public class CustomPlayMenu extends ItemsAdderInventoryGUI {
     for (Gamemode gamemode : Gamemode.values()) {
       addButton(createGamemodeButton(gamemode));
     }
-    super.decorate(player);
   }
 
   private IAButton createGamemodeButton(Gamemode gamemode) {
@@ -304,7 +301,6 @@ public class GridMenu extends InventoryGUI {
       }
     }
 
-    super.decorate(player);
   }
 
   private ItemStack createGridItem(int row, int col) {
@@ -367,7 +363,6 @@ public class PaginatedIAMenu extends InventoryGUI {
       addButton(53, nextButton());
     }
 
-    super.decorate(player);
   }
 }
 ```
@@ -466,7 +461,8 @@ IAButton automatically validates inputs:
 - **Width**: Must be between 1 and 9 (inclusive)
 - **Height**: Must be between 1 and 6 (inclusive)
 - **Anchor**: Must be non-negative
-- **Overflow**: Automatically prevents overflow beyond 9-slot width per row
+- **Overflow**: An area that runs past the right edge (anchor column + width > 9) throws when the button is added
+- **Inventory size**: A slot past the end of the inventory throws when the GUI is drawn, naming the slot and the inventory size
 
 ```java
 // These will throw IllegalArgumentException

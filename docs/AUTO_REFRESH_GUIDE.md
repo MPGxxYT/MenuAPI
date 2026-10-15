@@ -53,7 +53,6 @@ public class DynamicMenu extends InventoryGUI {
   @Override
   public void decorate(Player player) {
     addButton(13, dynamicButton());
-    super.decorate(player);
   }
 
   private InventoryButton dynamicButton() {
@@ -139,8 +138,7 @@ Recreate the entire menu with updated data:
 ```java
 @Override
 protected void refreshGUI() {
-  // Stop auto-refresh on this instance
-  stopAutoRefresh();
+  // Opening a new GUI ends this session and its refresh task
 
   // Get updated data
   Set<Lobby> lobbies = LobbyManager.getInstance().getLobbies();
@@ -207,7 +205,6 @@ public class LobbyMenu extends InventoryGUI {
     addButton(13, statusButton());
     addButton(16, timerButton());
     addButton(22, joinButton());
-    super.decorate(player);
   }
 
   private InventoryButton playerCountButton() {
@@ -325,7 +322,6 @@ public class StatsDashboard extends InventoryGUI {
     addButton(12, memoryButton());
     addButton(14, playersButton());
     addButton(16, uptimeButton());
-    super.decorate(player);
   }
 
   private InventoryButton tpsButton() {
@@ -454,7 +450,6 @@ protected void refreshGUI() {
   refreshButtons();
 
   // Over this (expensive)
-  stopAutoRefresh();
   GUIManager.getInstance().openGUI(new MyMenu(), getRegisteredPlayer());
 }
 ```
@@ -524,7 +519,6 @@ refreshButton(10);  // Only slot 10 updates
 - Ensure you called `enableAutoRefresh()` in the constructor
 - Check that the plugin instance is not null
 - Verify the interval is positive (> 0)
-- Make sure `super.onOpen()` is called if you override `onOpen()`
 
 ```java
 public MyMenu() {
@@ -538,17 +532,9 @@ public MyMenu() {
 **Problem:** Task continues after GUI closes.
 
 **Solutions:**
-- Don't call `startAutoRefresh()` manually
-- Ensure `super.onClose()` is called if you override `onClose()`
+- Make sure the GUI was opened with `GUIManager.getInstance().openGUI(...)`, so the GUIManager sees it close
 - Check for duplicate GUI instances
-
-```java
-@Override
-public void onClose(InventoryCloseEvent event) {
-  super.onClose(event);  // This stops auto-refresh
-  // Your custom close logic here
-}
-```
+- Call `disableAutoRefresh()` to stop refreshing while the GUI stays open
 
 ### High Server Load
 

@@ -1,17 +1,23 @@
 package me.mortaldev.menuapi;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitTask;
 
 /**
- * Manages active custom inventories and dispatches inventory events to their respective handlers.
- * This class implements the Singleton design pattern.
+ * Runs GUI sessions: opens GUIs, tracks which GUI each player has open, draws buttons, applies
+ * click rules, and runs auto-refresh. Click and close events reach it through {@link GUIListener};
+ * sessions start in {@link #openGUI}.
  */
 public class GUIManager {
 
@@ -23,191 +29,185 @@ public class GUIManager {
     return Singleton.INSTANCE;
   }
 
-  private GUIManager() {}
+  /** Package-private so tests can start from an empty manager. */
+  GUIManager() {}
 
-  private final Map<Inventory, InventoryHandler> activeInventories = new HashMap<>(); //
+  /** The open GUI for one player, and its auto-refresh task if one is running. */
+  private static final class Session {
+    private final InventoryGUI gui;
+    private BukkitTask refreshTask;
+
+    private Session(InventoryGUI gui) {
+      this.gui = gui;
+    }
+
+    private void stopRefresh() {
+      if (refreshTask != null && !refreshTask.isCancelled()) {
+        refreshTask.cancel();
+      }
+      refreshTask = null;
+    }
+  }
+
+  private final Map<Inventory, InventoryGUI> guisByInventory = new HashMap<>();
+  private final Map<UUID, Session> sessions = new HashMap<>();
 
   /**
-   * Opens a custom GUI for a player.
-   * The GUI is registered with the manager and then opened for the player.
+   * Opens a GUI for a player and starts its session. If the open is cancelled (for example by
+   * another plugin), no session starts.
    *
    * @param gui The InventoryGUI to open.
    * @param player The player to open the GUI for.
+   * @throws IllegalStateException If this GUI instance has already been opened.
    */
   public void openGUI(InventoryGUI gui, Player player) {
-    gui.registerPlayer(player); //
+    if (gui.hasRegisteredPlayer()) {
+      throw new IllegalStateException(
+          "This GUI has already been opened. Create a new instance to open it again.");
+    }
+    gui.registerPlayer(player);
 
-    // Special handling for ItemsAdder GUIs that use wrappers
-    if (gui instanceof ItemsAdderInventoryGUI) {
-      ItemsAdderInventoryGUI iaGUI = (ItemsAdderInventoryGUI) gui;
-      if (iaGUI.usesWrapper()) {
-        // ItemsAdder GUI with wrapper - let it handle opening
-        try {
-          Object wrapper = iaGUI.createItemsAdderWrapper(player);
-          // Use reflection to call showInventory since we can't depend on ItemsAdder
-          wrapper.getClass().getMethod("showInventory", Player.class).invoke(wrapper, player);
-          Inventory inventory = player.getOpenInventory().getTopInventory();
-          // Set the inventory in the GUI so decorate() can use it
-          gui.setInventory(inventory);
-          this.registerHandledInventory(inventory, gui);
+    Inventory inventory = gui.show(player);
+    if (inventory == null || player.getOpenInventory().getTopInventory() != inventory) {
+      // The open was cancelled, for example by another plugin
+      return;
+    }
+    guisByInventory.put(inventory, gui);
+    startSession(gui, player, new InventoryOpenEvent(player.getOpenInventory()));
+  }
 
-          // Show HUD animations if specified
-          java.util.List<String> hudIds = iaGUI.getHudIds(player);
-          if (!hudIds.isEmpty()) {
-            iaGUI.setActiveHudIds(hudIds);
-            showHuds(player, hudIds);
-          }
+  /**
+   * Gets the GUI a player currently has open.
+   *
+   * @param player The player to check.
+   * @return The open GUI, or null if the player doesn't have a GUI open.
+   */
+  public InventoryGUI getOpenGUI(Player player) {
+    Session session = sessions.get(player.getUniqueId());
+    return session == null ? null : session.gui;
+  }
 
-          // Trigger onOpen to start auto-refresh and call decorate
-          InventoryOpenEvent openEvent = new InventoryOpenEvent(player.getOpenInventory());
-          gui.onOpen(openEvent);
-        } catch (NoSuchMethodException e) {
-          throw new RuntimeException("Failed to open ItemsAdder GUI. The wrapper object doesn't have a showInventory method. Make sure you're returning a TexturedInventoryWrapper from createItemsAdderWrapper()", e);
-        } catch (Exception e) {
-          // GUI opened successfully but there was an issue - suppress error since it's working
-          // This can happen with ItemsAdder's internal processes
-          Inventory inventory = player.getOpenInventory().getTopInventory();
-          gui.setInventory(inventory);
-          this.registerHandledInventory(inventory, gui);
+  /**
+   * Checks if a player currently has a GUI open.
+   *
+   * @param player The player to check.
+   * @return True if the player has a GUI open.
+   */
+  public boolean hasOpenGUI(Player player) {
+    return sessions.containsKey(player.getUniqueId());
+  }
 
-          // Show HUD animations if specified
-          java.util.List<String> hudIds = iaGUI.getHudIds(player);
-          if (!hudIds.isEmpty()) {
-            iaGUI.setActiveHudIds(hudIds);
-            showHuds(player, hudIds);
-          }
+  /**
+   * Calls {@link InventoryGUI#refreshGUI()} on every open GUI of the given type.
+   *
+   * <pre>{@code
+   * GUIManager.getInstance().refreshAllGUIsOfType(LobbiesMenu.class);
+   * }</pre>
+   *
+   * @param guiClass The class of GUIs to refresh.
+   */
+  public void refreshAllGUIsOfType(Class<? extends InventoryGUI> guiClass) {
+    for (InventoryGUI gui : openGUIsOfType(guiClass)) {
+      gui.refreshGUI();
+    }
+  }
 
-          // Trigger onOpen to start auto-refresh and call decorate
-          InventoryOpenEvent openEvent = new InventoryOpenEvent(player.getOpenInventory());
-          gui.onOpen(openEvent);
-        }
-        return;
+  /**
+   * Redraws button icons on every open GUI of the given type, without calling {@link
+   * InventoryGUI#refreshGUI()}.
+   *
+   * @param guiClass The class of GUIs to refresh.
+   */
+  public void refreshButtonsForType(Class<? extends InventoryGUI> guiClass) {
+    for (InventoryGUI gui : openGUIsOfType(guiClass)) {
+      gui.refreshButtons();
+    }
+  }
+
+  // A copy, since refreshGUI() may open a new GUI and change the sessions map
+  private List<InventoryGUI> openGUIsOfType(Class<? extends InventoryGUI> guiClass) {
+    List<InventoryGUI> guis = new ArrayList<>();
+    for (Session session : sessions.values()) {
+      if (guiClass.isInstance(session.gui)) {
+        guis.add(session.gui);
       }
     }
-
-    // Standard GUI opening
-    this.registerHandledInventory(gui.getInventory(), gui); //
-    player.openInventory(gui.getInventory()); //
+    return guis;
   }
 
   /**
-   * Registers an inventory with its corresponding handler.
-   * This allows the GUIManager to dispatch events to the correct {@link InventoryHandler}.
-   *
-   * @param inventory The inventory to register.
-   * @param handler The handler for the inventory.
-   */
-  public void registerHandledInventory(Inventory inventory, InventoryHandler handler) {
-    this.activeInventories.put(inventory, handler); //
-  }
-
-  /**
-   * Unregisters an inventory, removing it from the active inventories.
-   *
-   * @param inventory The inventory to unregister.
-   */
-  public void unregisterInventory(Inventory inventory) {
-    this.activeInventories.remove(inventory); //
-  }
-
-  /**
-   * Handles an inventory click event. It retrieves the appropriate {@link InventoryHandler}
-   * for the clicked inventory and dispatches the event.
+   * Applies the GUI's click rules, then calls its onClick hook, then the clicked button's handler.
    *
    * @param event The InventoryClickEvent.
    */
   public void handleClick(InventoryClickEvent event) {
-    InventoryHandler handler = this.activeInventories.get(event.getInventory()); //
-    if (handler != null) { //
-      handler.onClick(event); //
+    InventoryGUI gui = guisByInventory.get(event.getInventory());
+    if (gui == null) {
+      return;
     }
+    gui.applyClickRules(event);
+    gui.onClick(event);
+    gui.clickButton(event);
   }
 
   /**
-   * Handles an inventory open event. It retrieves the appropriate {@link InventoryHandler}
-   * for the opened inventory and dispatches the event.
-   *
-   * @param event The InventoryOpenEvent.
-   */
-  public void handleOpen(InventoryOpenEvent event) {
-    InventoryHandler handler = this.activeInventories.get(event.getInventory()); //
-    if (handler != null) { //
-      handler.onOpen(event); //
-    }
-  }
-
-  /**
-   * Handles an inventory close event. It retrieves the appropriate {@link InventoryHandler}
-   * for the closed inventory, dispatches the event, and then unregisters the inventory.
+   * Calls the GUI's onClose hook and ends its session.
    *
    * @param event The InventoryCloseEvent.
    */
   public void handleClose(InventoryCloseEvent event) {
-    Inventory inventory = event.getInventory(); //
-    InventoryHandler handler = this.activeInventories.get(inventory); //
-    if (handler != null) { //
-      // Hide HUDs for ItemsAdder GUIs
-      if (handler instanceof ItemsAdderInventoryGUI) {
-        ItemsAdderInventoryGUI iaGUI = (ItemsAdderInventoryGUI) handler;
-        java.util.List<String> hudIds = iaGUI.getActiveHudIds();
-        if (!hudIds.isEmpty()) {
-          hideHuds((Player) event.getPlayer(), hudIds);
-        }
-      }
-
-      handler.onClose(event); //
-      this.unregisterInventory(inventory); //
+    Inventory inventory = event.getInventory();
+    InventoryGUI gui = guisByInventory.get(inventory);
+    if (gui == null) {
+      return;
     }
+    Player player = (Player) event.getPlayer();
+
+    gui.onClose(event);
+    gui.hidden(player);
+
+    Session session = sessions.get(player.getUniqueId());
+    if (session != null && session.gui == gui) {
+      session.stopRefresh();
+      sessions.remove(player.getUniqueId());
+    }
+    guisByInventory.remove(inventory);
   }
 
-  /**
-   * Shows HUDs for a player using reflection to avoid ItemsAdder dependency.
-   *
-   * @param player The player to show HUDs for.
-   * @param hudIds List of HUD namespace IDs to show.
-   */
-  private void showHuds(Player player, java.util.List<String> hudIds) {
-    try {
-      // PlayerHudsHolderWrapper hudsHolder = new PlayerHudsHolderWrapper(player);
-      Class<?> holderClass = Class.forName("dev.lone.itemsadder.api.FontImages.PlayerHudsHolderWrapper");
-      Object hudsHolder = holderClass.getConstructor(Player.class).newInstance(player);
-
-      for (String hudId : hudIds) {
-        // PlayerQuantityHudWrapper hud = hudsHolder.getHud(hudId);
-        Object hud = holderClass.getMethod("getHud", String.class).invoke(hudsHolder, hudId);
-        if (hud != null) {
-          // hud.show();
-          hud.getClass().getMethod("show").invoke(hud);
-        }
-      }
-    } catch (Exception e) {
-      // Silently fail if ItemsAdder classes not found or HUD doesn't exist
-      // This is expected if ItemsAdder is not installed or HUD is not configured
+  private void startSession(InventoryGUI gui, Player player, InventoryOpenEvent event) {
+    Session previous = sessions.get(player.getUniqueId());
+    if (previous != null && previous.gui != gui) {
+      previous.stopRefresh();
     }
+    Session session = new Session(gui);
+    sessions.put(player.getUniqueId(), session);
+
+    gui.decorate(player);
+    gui.renderButtons(player);
+    gui.onOpen(event);
+    startRefresh(session, player.getUniqueId());
   }
 
-  /**
-   * Hides HUDs for a player using reflection to avoid ItemsAdder dependency.
-   *
-   * @param player The player to hide HUDs for.
-   * @param hudIds List of HUD namespace IDs to hide.
-   */
-  private void hideHuds(Player player, List<String> hudIds) {
-    try {
-      // PlayerHudsHolderWrapper hudsHolder = new PlayerHudsHolderWrapper(player);
-      Class<?> holderClass = Class.forName("dev.lone.itemsadder.api.FontImages.PlayerHudsHolderWrapper");
-      Object hudsHolder = holderClass.getConstructor(Player.class).newInstance(player);
-
-      for (String hudId : hudIds) {
-        // PlayerQuantityHudWrapper hud = hudsHolder.getHud(hudId);
-        Object hud = holderClass.getMethod("getHud", String.class).invoke(hudsHolder, hudId);
-        if (hud != null) {
-          // hud.hide();
-          hud.getClass().getMethod("hide").invoke(hud);
-        }
-      }
-    } catch (Exception e) {
-      // Silently fail if ItemsAdder classes not found or HUD doesn't exist
+  private void startRefresh(Session session, UUID playerId) {
+    InventoryGUI gui = session.gui;
+    Plugin plugin = gui.getAutoRefreshPlugin();
+    if (!gui.isAutoRefreshEnabled() || plugin == null) {
+      return;
     }
+    long interval = gui.getAutoRefreshIntervalTicks();
+    session.refreshTask =
+        Bukkit.getScheduler()
+            .runTaskTimer(
+                plugin,
+                () -> {
+                  Player player = Bukkit.getPlayer(playerId);
+                  if (!gui.isAutoRefreshEnabled() || player == null || !player.isOnline()) {
+                    session.stopRefresh();
+                    return;
+                  }
+                  gui.refreshGUI();
+                },
+                interval,
+                interval);
   }
 }
