@@ -10,8 +10,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 
 /**
- * A specialized InventoryGUI implementation designed for ItemsAdder custom GUIs. ItemsAdder is
- * accessed through reflection, so this class loads without ItemsAdder installed.
+ * An {@link InventoryGUI} that shows an ItemsAdder textured inventory, with optional ItemsAdder
+ * HUDs while it is open. Buttons, hooks, click rules, auto-refresh and {@link #rebuild()} work as in
+ * any other GUI. ItemsAdder is accessed through reflection, so this class loads without ItemsAdder
+ * installed; your plugin compiles against ItemsAdder's API for the wrapper classes.
  *
  * <p>This class can be used in two ways:
  *
@@ -62,7 +64,8 @@ public class ItemsAdderInventoryGUI extends InventoryGUI {
   private final List<String> activeHudIds = new ArrayList<>();
 
   /**
-   * Default constructor for subclasses that will override {@link #createItemsAdderWrapper(Player)}.
+   * Creates a GUI that gets its textured inventory from {@link #createItemsAdderWrapper(Player)}.
+   * Use this constructor, usually implicitly, in a subclass that overrides that method.
    */
   public ItemsAdderInventoryGUI() {
     super();
@@ -70,10 +73,16 @@ public class ItemsAdderInventoryGUI extends InventoryGUI {
   }
 
   /**
-   * Constructs a new ItemsAdderInventoryGUI with a pre-existing inventory. This inventory should
-   * have been created by ItemsAdder's TexturedInventoryWrapper.
+   * Creates a GUI around an inventory ItemsAdder has already opened, so MenuAPI can add buttons to
+   * it. Open it with {@link GUIManager#openGUI} as usual; if the inventory is already on the
+   * player's screen, it is not opened again.
    *
-   * @param existingInventory The inventory created by ItemsAdder.
+   * <p>Buttons can be added with {@code addButton} before opening, or in {@link #decorate(Player)}
+   * in a subclass. A {@link #rebuild()} keeps this inventory and only redraws the buttons.
+   *
+   * @param existingInventory The inventory from {@code TexturedInventoryWrapper}, usually {@code
+   *     player.getOpenInventory().getTopInventory()} right after calling its {@code showInventory}.
+   *     Passing {@code null} makes this GUI use {@link #createItemsAdderWrapper(Player)} instead.
    */
   public ItemsAdderInventoryGUI(Inventory existingInventory) {
     super();
@@ -81,16 +90,27 @@ public class ItemsAdderInventoryGUI extends InventoryGUI {
   }
 
   /**
-   * Override this method in subclasses to create your ItemsAdder GUI. This method should:
+   * Creates the ItemsAdder wrapper this GUI opens. Override it in a subclass that uses the
+   * no-argument constructor:
    *
    * <ol>
-   *   <li>Create the FontImageWrapper with your namespace ID
-   *   <li>Create the TexturedInventoryWrapper
-   *   <li>Return the TexturedInventoryWrapper (do NOT call showInventory)
+   *   <li>Create a {@code FontImageWrapper} with your texture's namespaced ID.
+   *   <li>Create a {@code TexturedInventoryWrapper} with it.
+   *   <li>Return the wrapper without calling {@code showInventory}; MenuAPI calls it for you.
    * </ol>
    *
-   * @param player The player to open the GUI for.
-   * @return The TexturedInventoryWrapper that will be used to open the inventory.
+   * <p>It runs every time the GUI opens, and on every {@link #rebuild()}, so return a new wrapper
+   * each time. The return type is {@code Object} so MenuAPI needs no compile-time dependency on
+   * ItemsAdder; it finds {@code showInventory(Player)} through reflection.
+   *
+   * <p>Opening fails with an {@link IllegalStateException} from {@link GUIManager#openGUI} if the
+   * returned object has no public {@code showInventory(Player)} method, or if that method throws
+   * without opening anything. If it opens nothing and doesn't throw, no session starts.
+   *
+   * @param player The player the GUI is opening for.
+   * @return A new {@code TexturedInventoryWrapper}.
+   * @throws UnsupportedOperationException If not overridden. The default exists only for GUIs
+   *     created with an existing inventory, which never call it.
    */
   protected Object createItemsAdderWrapper(Player player) {
     throw new UnsupportedOperationException(
@@ -98,20 +118,27 @@ public class ItemsAdderInventoryGUI extends InventoryGUI {
   }
 
   /**
-   * Override this method to specify which HUD animations should be shown with this GUI. Return a
-   * list of HUD namespace IDs (e.g., "crusaders:play_gui_animated"). These HUDs are shown when the
-   * GUI opens and hidden when it closes.
+   * Lists the ItemsAdder HUDs to show while this GUI is open. Override it to return their namespaced
+   * IDs, for example {@code List.of("crusaders:play_gui_animated")}.
+   *
+   * <p>It runs each time the GUI is shown: on open, and on a {@link #rebuild()} that opens a new
+   * inventory. The HUDs are shown then and hidden when the GUI closes or is shown again. An ID that
+   * doesn't exist, or a server without ItemsAdder, is ignored without an error.
    *
    * @param player The player viewing the GUI.
-   * @return List of HUD IDs to show, or empty list for no HUDs.
+   * @return HUD IDs to show. The default is an empty list, for no HUDs.
    */
   protected List<String> getHudIds(Player player) {
     return new ArrayList<>();
   }
 
   /**
-   * Returns the pre-existing inventory. GUIs that use a wrapper get their inventory when they are
-   * opened, so this is not called for them.
+   * Returns the inventory passed to the constructor. You don't override this in an ItemsAdder GUI:
+   * a GUI that uses a wrapper gets its inventory from the wrapper when it opens.
+   *
+   * @return The existing inventory passed to the constructor.
+   * @throws UnsupportedOperationException If this GUI uses a wrapper, which has no inventory before
+   *     it opens. This also means {@link #getInventory()} throws until then.
    */
   @Override
   protected Inventory createInventory() {
@@ -123,9 +150,10 @@ public class ItemsAdderInventoryGUI extends InventoryGUI {
   }
 
   /**
-   * Checks if this GUI uses an ItemsAdder wrapper (class-based) or a pre-existing inventory.
+   * Returns whether this GUI opens its inventory through {@link #createItemsAdderWrapper(Player)},
+   * rather than using an inventory passed to the constructor.
    *
-   * @return True if using a wrapper, false if using a pre-existing inventory.
+   * @return {@code true} if it uses a wrapper, {@code false} if it was given an existing inventory.
    */
   public boolean usesWrapper() {
     return existingInventory == null;

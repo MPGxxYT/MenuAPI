@@ -9,12 +9,28 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.ItemStack;
 
 /**
- * IAButton (Inventory Area Button) extends InventoryButton to support filling multiple slots
- * based on a rectangular size (width x height) anchored at a specific slot.
+ * An area button (Inventory Area Button): one button that covers a rectangle of slots. Every slot in
+ * the rectangle shows the same icon and runs the same click handler.
  *
- * The button fills slots in a grid pattern starting from the anchor slot.
- * For example, with anchor slot 0, width 3, and height 2, it fills slots:
- * 0, 1, 2 (first row) and 9, 10, 11 (second row, assuming 9-slot width inventory).
+ * <p>The rectangle starts at the {@link #anchor(int) anchor} slot, its top-left corner, and extends
+ * {@link #size(int, int) width} slots to the right and height rows down. Rows are 9 slots wide, so
+ * anchor 0 with size 3 by 2 covers slots 0, 1, 2 and 9, 10, 11:
+ *
+ * <pre>{@code
+ * addButton(new IAButton()
+ *     .size(3, 2)
+ *     .anchor(0)
+ *     .creator(player -> new ItemStack(Material.DIAMOND_SWORD))
+ *     .consumer(event -> startGame((Player) event.getWhoClicked())));
+ * }</pre>
+ *
+ * <p>Set the size and anchor before passing the button to {@link InventoryGUI#addButton(IAButton)}.
+ * The covered slots are worked out when the button is added, so changing the size or anchor
+ * afterwards does not move it. A 1 by 1 area button at anchor 0 is the default.
+ *
+ * <p>{@link InventoryGUI#getButton(int)} returns this button for any slot it covers, and {@link
+ * InventoryGUI#removeButton(int)} or {@link InventoryGUI#refreshButton(int)} on any covered slot
+ * affects the whole area.
  */
 public class IAButton extends InventoryButton {
 
@@ -23,12 +39,23 @@ public class IAButton extends InventoryButton {
   private int anchorSlot = 0;
 
   /**
-   * Sets the size of the button area.
+   * Creates a 1 by 1 area button anchored at slot 0, with no icon and no click handler. Set them
+   * with {@link #size}, {@link #anchor}, {@link #creator} and {@link #consumer}.
+   */
+  public IAButton() {}
+
+  /**
+   * Sets how many slots wide and how many rows tall the area is.
    *
-   * @param width The width of the button area (max 9)
-   * @param height The height of the button area (max 6)
-   * @return This IAButton instance for chaining
-   * @throws IllegalArgumentException if width > 9 or height > 6
+   * <p>The area must also fit the inventory it is added to: running past the right edge makes {@link
+   * InventoryGUI#addButton(IAButton)} throw, and running past the last row makes drawing the GUI
+   * throw. Call this before adding the button to a GUI.
+   *
+   * @param width Slots per row, from 1 to 9.
+   * @param height Number of rows, from 1 to 6.
+   * @return This button, for chaining.
+   * @throws IllegalArgumentException If width is not between 1 and 9, or height is not between 1 and
+   *     6.
    */
   public IAButton size(int width, int height) {
     if (width > 9) {
@@ -46,12 +73,13 @@ public class IAButton extends InventoryButton {
   }
 
   /**
-   * Sets the anchor slot (top-left corner) from which the button area will be filled.
-   * The anchor slot depends on the inventory size and the button size.
+   * Sets the area's top-left slot. Slots count from 0 in the top-left corner of the inventory, 9 per
+   * row, so slot 10 is the second slot of the second row. Call this before adding the button to a
+   * GUI.
    *
-   * @param slot The anchor slot index
-   * @return This IAButton instance for chaining
-   * @throws IllegalArgumentException if slot is negative
+   * @param slot The top-left slot of the area, 0 or higher.
+   * @return This button, for chaining.
+   * @throws IllegalArgumentException If the slot is negative.
    */
   public IAButton anchor(int slot) {
     if (slot < 0) {
@@ -62,10 +90,12 @@ public class IAButton extends InventoryButton {
   }
 
   /**
-   * Overrides the creator method to return IAButton for chaining.
+   * Sets the function that creates the icon shown in every slot of the area. Behaves like {@link
+   * InventoryButton#creator(Function)}, and returns this {@code IAButton} so {@link #size} and
+   * {@link #anchor} can still be chained after it.
    *
-   * @param iconCreator The function to create the button's icon
-   * @return This IAButton instance for chaining
+   * @param iconCreator Creates the icon for the given player. May be {@code null} for empty slots.
+   * @return This button, for chaining.
    */
   @Override
   public IAButton creator(Function<Player, ItemStack> iconCreator) {
@@ -74,10 +104,12 @@ public class IAButton extends InventoryButton {
   }
 
   /**
-   * Overrides the consumer method to return IAButton for chaining.
+   * Sets the handler that runs when a player clicks any slot of the area. Behaves like {@link
+   * InventoryButton#consumer(Consumer)}; {@code event.getSlot()} tells you which slot was clicked.
+   * Returns this {@code IAButton} so {@link #size} and {@link #anchor} can still be chained after it.
    *
-   * @param eventConsumer The consumer to handle the click event
-   * @return This IAButton instance for chaining
+   * @param eventConsumer Runs on each click. May be {@code null} for an area that only shows icons.
+   * @return This button, for chaining.
    */
   @Override
   public IAButton consumer(Consumer<InventoryClickEvent> eventConsumer) {
@@ -86,13 +118,12 @@ public class IAButton extends InventoryButton {
   }
 
   /**
-   * Calculates all slot indices that this button should occupy based on
-   * the anchor slot, width, and height.
+   * Lists every slot the area covers, row by row from the anchor. MenuAPI calls this when the button
+   * is added to a GUI; you can call it to check a layout. It does not check the bottom edge, since
+   * the inventory's height is not known here.
    *
-   * Assumes standard Minecraft inventory layout where each row has 9 slots.
-   *
-   * @return List of all slot indices this button occupies
-   * @throws IllegalArgumentException If the area runs past the right edge of the inventory.
+   * @return The covered slot indices, left to right and top to bottom.
+   * @throws IllegalArgumentException If the area runs past the right edge of a 9-slot row.
    */
   public List<Integer> getOccupiedSlots() {
     List<Integer> slots = new ArrayList<>();
@@ -120,27 +151,27 @@ public class IAButton extends InventoryButton {
   }
 
   /**
-   * Gets the width of this button area.
+   * Returns the area's width, set with {@link #size}.
    *
-   * @return The width
+   * @return Slots per row, from 1 to 9. Defaults to 1.
    */
   public int getWidth() {
     return width;
   }
 
   /**
-   * Gets the height of this button area.
+   * Returns the area's height, set with {@link #size}.
    *
-   * @return The height
+   * @return Number of rows, from 1 to 6. Defaults to 1.
    */
   public int getHeight() {
     return height;
   }
 
   /**
-   * Gets the anchor slot of this button area.
+   * Returns the area's top-left slot, set with {@link #anchor}.
    *
-   * @return The anchor slot index
+   * @return The anchor slot. Defaults to 0.
    */
   public int getAnchorSlot() {
     return anchorSlot;
