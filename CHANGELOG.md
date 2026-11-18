@@ -2,6 +2,28 @@
 
 Changes to MenuAPI, newest first. Versions match the Git tags that JitPack builds from.
 
+## 2.1.1
+
+Documentation release. No behavior changes.
+
+### Added
+
+- Javadoc on every public and protected class, constructor and method, covering when each method runs, what isn't available yet, defaults, edge cases, and the exact condition behind every exception. IDEs show it from the sources jar JitPack publishes.
+- A package overview (`package-info.java`) with the steps to a first menu and a summary of each class.
+
+### Known behavior
+
+The new docs describe these as they are today:
+
+- `GUIListener` doesn't handle `InventoryDragEvent`. If a menu allows clicks in the player's inventory, a player can drag an item from their cursor across the menu's slots.
+- With `allowBottomInventoryClick(true)`, a shift-click in the player's inventory moves the item into the menu, even when `allowTopInventoryClick` is `false`.
+- `enableAutoRefresh(null, ticks)` is accepted, but no refresh task starts.
+- `GUIManager.handleClick` and `handleClose` are public, but only `GUIListener` should call them. Calling them yourself runs every handler again.
+
+### Compatibility
+
+No breaking changes. `InventoryButton` and `IAButton` now declare their no-argument constructors explicitly. Before, Java generated identical ones automatically.
+
 ## 2.1.0
 
 ### Added
