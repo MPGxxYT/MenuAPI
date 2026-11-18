@@ -6,26 +6,41 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 
 /**
- * Listens for Bukkit inventory events and delegates them to the {@link GUIManager}.
+ * Passes Bukkit's inventory click and close events to a {@link GUIManager}. Without it, menus still
+ * open, but buttons do nothing, clicks are not cancelled, and sessions never end.
+ *
+ * <p>Register it once, in your plugin's {@code onEnable()}:
+ *
+ * <pre>{@code
+ * getServer().getPluginManager().registerEvents(
+ *     new GUIListener(GUIManager.getInstance()), this);
+ * }</pre>
+ *
+ * <p>Register only one listener per manager. Each registered listener passes every event on, so two
+ * listeners make every click handler and hook run twice.
+ *
+ * <p>Inventory drag events are not handled. A player who has an item on their cursor can drag it
+ * across a menu's slots unless your plugin cancels {@code InventoryDragEvent} itself.
  */
 public class GUIListener implements Listener {
 
   private final GUIManager guiManager;
 
   /**
-   * Constructs a new GUIListener with the given GUIManager.
+   * Creates a listener that sends events to the given manager. Pass {@link
+   * GUIManager#getInstance()}.
    *
-   * @param guiManager The GUIManager instance to handle events.
+   * @param guiManager The manager that runs your menus.
    */
   public GUIListener(GUIManager guiManager) {
     this.guiManager = guiManager;
   }
 
   /**
-   * Handles inventory click events. This method is called by the Bukkit event system
-   * when a player clicks in an inventory. It delegates the handling to the {@link GUIManager}.
+   * Called by Bukkit for every inventory click on the server. Clicks in an inventory MenuAPI did not
+   * open are ignored. You don't call this yourself.
    *
-   * @param event The InventoryClickEvent.
+   * @param event The click event from Bukkit.
    */
   @EventHandler
   public void onClick(InventoryClickEvent event) {
@@ -33,10 +48,10 @@ public class GUIListener implements Listener {
   }
 
   /**
-   * Handles inventory close events. This method is called by the Bukkit event system
-   * when an inventory is closed. It delegates the handling to the {@link GUIManager}.
+   * Called by Bukkit for every inventory close on the server. Closes of an inventory MenuAPI did not
+   * open are ignored. You don't call this yourself.
    *
-   * @param event The InventoryCloseEvent.
+   * @param event The close event from Bukkit.
    */
   @EventHandler
   public void onClose(InventoryCloseEvent event) {
