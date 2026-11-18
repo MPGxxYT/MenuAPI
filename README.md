@@ -44,7 +44,7 @@ MenuAPI is published through [JitPack](https://jitpack.io/#MPGxxYT/MenuAPI).
 <dependency>
     <groupId>com.github.MPGxxYT</groupId>
     <artifactId>MenuAPI</artifactId>
-    <version>v2.1.0</version>
+    <version>v2.1.1</version>
 </dependency>
 ```
 
@@ -56,7 +56,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.MPGxxYT:MenuAPI:v2.1.0'
+    implementation 'com.github.MPGxxYT:MenuAPI:v2.1.1'
 }
 ```
 
